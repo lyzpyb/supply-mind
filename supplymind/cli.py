@@ -14,6 +14,15 @@ Usage:
     supplymind inventory-policy-sim --sku-id SKU001 --demand-mean 150
     supplymind inventory-multi-echelon --config network.json
     supplymind inventory-newsvendor --price 29.99 --cost 12.00
+    supplymind pricing-elasticity -p "9.99,8.99,7.99" -q "100,130,170"
+    supplymind pricing-markdown --stock 500 --cost 5.0 --price 19.99 --days 14
+    supplymind pricing-lifecycle -s "10,15,22,35,48,55,60,58,52,45"
+    supplymind pricing-bundling -t transactions.json
+    supplymind fulfill-allocation -o orders.json -i inventory.json
+    supplymind fulfill-routing -l locations.json
+    supplymind fulfill-wave -o orders.json
+    supplymind fulfill-capacity -r resources.json
+    supplymind what-if -s scenarios.json
     supplymind run-pipeline pipelines/retail-replenish.yaml --data data.csv
 """
 
@@ -100,6 +109,48 @@ main.add_command(
 main.add_command(
     __import__("supplymind.skills.inventory.newsvendor.cli", fromlist=["inventory_newsvendor"]).inventory_newsvendor,
     name="inventory-newsvendor",
+)
+
+# Pricing Skills (Phase 3)
+main.add_command(
+    __import__("supplymind.skills.pricing.elasticity.cli", fromlist=["pricing_elasticity"]).pricing_elasticity,
+    name="pricing-elasticity",
+)
+main.add_command(
+    __import__("supplymind.skills.pricing.markdown.cli", fromlist=["pricing_markdown"]).pricing_markdown,
+    name="pricing-markdown",
+)
+main.add_command(
+    __import__("supplymind.skills.pricing.lifecycle.cli", fromlist=["pricing_lifecycle"]).pricing_lifecycle,
+    name="pricing-lifecycle",
+)
+main.add_command(
+    __import__("supplymind.skills.pricing.bundling.cli", fromlist=["pricing_bundling"]).pricing_bundling,
+    name="pricing-bundling",
+)
+
+# Fulfillment Skills (Phase 3)
+main.add_command(
+    __import__("supplymind.skills.fulfillment.allocation.cli", fromlist=["fulfill_allocation"]).fulfill_allocation,
+    name="fulfill-allocation",
+)
+main.add_command(
+    __import__("supplymind.skills.fulfillment.routing.cli", fromlist=["fulfill_routing"]).fulfill_routing,
+    name="fulfill-routing",
+)
+main.add_command(
+    __import__("supplymind.skills.fulfillment.wave.cli", fromlist=["fulfill_wave"]).fulfill_wave,
+    name="fulfill-wave",
+)
+main.add_command(
+    __import__("supplymind.skills.fulfillment.capacity.cli", fromlist=["fulfill_capacity"]).fulfill_capacity,
+    name="fulfill-capacity",
+)
+
+# Common Skills (Phase 3)
+main.add_command(
+    __import__("supplymind.skills.common.what_if.cli", fromlist=["what_if"]).what_if,
+    name="what-if",
 )
 
 

@@ -144,6 +144,72 @@ class MCPServer:
                 },
                 "handler": self._handle_run_pipeline,
             },
+            # Phase 3: Pricing tools
+            "pricing_elasticity": {
+                "description": "Estimate price elasticity using log-log OLS regression. Returns elasticity coefficient, classification, and revenue-optimal price.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "prices": {"type": "array", "items": {"type": "number"}, "description": "Historical prices"},
+                        "quantities": {"type": "array", "items": {"type": "number"}, "description": "Corresponding quantities sold"},
+                    },
+                    "required": ["prices", "quantities"],
+                },
+                "handler": self._handle_pricing_elasticity,
+            },
+            "pricing_markdown": {
+                "description": "Optimize phased markdown (clearance) pricing strategy under time pressure.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "current_stock": {"type": "number", "description": "Units on hand to clear"},
+                        "unit_cost": {"type": "number", "description": "Per-unit cost"},
+                        "original_price": {"type": "number", "description": "Current/list price"},
+                        "elasticity": {"type": "number", "default": -2.0},
+                        "days_remaining": {"type": "integer", "default": 30},
+                    },
+                    "required": ["current_stock", "unit_cost", "original_price"],
+                },
+                "handler": self._handle_pricing_markdown,
+            },
+            "pricing_lifecycle": {
+                "description": "Detect product lifecycle stage (introduction/growth/maturity/decline) and recommend pricing strategy.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "weekly_sales": {"type": "array", "items": {"type": "number"}, "description": "Weekly sales volumes"},
+                        "weeks_since_launch": {"type": "integer"},
+                    },
+                    "required": ["weekly_sales"],
+                },
+                "handler": self._handle_pricing_lifecycle,
+            },
+            # Phase 3: Fulfillment tools
+            "fulfill_routing": {
+                "description": "Solve TSP route optimization using nearest neighbor + 2-opt improvement.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "locations": {"type": "array", "items": {"type": "object"}, "description": "Locations with lat, lon, demand"},
+                        "vehicle_capacity": {"type": "number", "default": 1000.0},
+                    },
+                    "required": ["locations"],
+                },
+                "handler": self._handle_fulfill_routing,
+            },
+            "what_if": {
+                "description": "Run multi-scenario what-if simulation comparing different parameter sets side by side.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "base_params": {"type": "object", "description": "Base parameters for simulation"},
+                        "scenarios": {"type": "array", "items": {"type": "object"}, "description": "Scenario definitions with name and params"},
+                        "skill_name": {"type": "string", "default": "inventory-policy-sim"},
+                    },
+                    "required": ["base_params", "scenarios"],
+                },
+                "handler": self._handle_what_if,
+            },
         }
 
     # ── Tool Handlers ──
@@ -258,6 +324,51 @@ class MCPServer:
             "output_summary": result.output_summary,
             "errors": result.errors,
         }
+
+    def _handle_pricing_elasticity(self, arguments: dict) -> dict:
+        from supplymind.skills.pricing.elasticity.main import PricingElasticity
+        from supplymind.skills.pricing.elasticity.schema import ElasticityInput
+
+        params = ElasticityInput(**arguments)
+        skill = PricingElasticity()
+        result = skill.run(params)
+        return result.model_dump()
+
+    def _handle_pricing_markdown(self, arguments: dict) -> dict:
+        from supplymind.skills.pricing.markdown.main import PricingMarkdown
+        from supplymind.skills.pricing.markdown.schema import MarkdownInput
+
+        params = MarkdownInput(**arguments)
+        skill = PricingMarkdown()
+        result = skill.run(params)
+        return result.model_dump()
+
+    def _handle_pricing_lifecycle(self, arguments: dict) -> dict:
+        from supplymind.skills.pricing.lifecycle.main import PricingLifecycle
+        from supplymind.skills.pricing.lifecycle.schema import LifecycleInput
+
+        params = LifecycleInput(**arguments)
+        skill = PricingLifecycle()
+        result = skill.run(params)
+        return result.model_dump()
+
+    def _handle_fulfill_routing(self, arguments: dict) -> dict:
+        from supplymind.skills.fulfillment.routing.main import FulfillmentRouting
+        from supplymind.skills.fulfillment.routing.schema import RoutingInput
+
+        params = RoutingInput(**arguments)
+        skill = FulfillmentRouting()
+        result = skill.run(params)
+        return result.model_dump()
+
+    def _handle_what_if(self, arguments: dict) -> dict:
+        from supplymind.skills.common.what_if.main import WhatIfSimulator
+        from supplymind.skills.common.what_if.schema import WhatIfInput
+
+        params = WhatIfInput(**arguments)
+        skill = WhatIfSimulator()
+        result = skill.run(params)
+        return result.model_dump()
 
     # ── Public API ──
 

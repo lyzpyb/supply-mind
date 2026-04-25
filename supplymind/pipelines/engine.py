@@ -112,6 +112,18 @@ def _get_skill_instance(skill_name: str):
         "inventory-policy-sim": ("supplymind.skills.inventory.policy_sim.main", "InventoryPolicySim"),
         "inventory-multi-echelon": ("supplymind.skills.inventory.multi_echelon.main", "InventoryMultiEchelon"),
         "inventory-newsvendor": ("supplymind.skills.inventory.newsvendor.main", "InventoryNewsvendor"),
+        # Pricing Skills (Phase 3)
+        "pricing-elasticity": ("supplymind.skills.pricing.elasticity.main", "PricingElasticity"),
+        "pricing-markdown": ("supplymind.skills.pricing.markdown.main", "PricingMarkdown"),
+        "pricing-lifecycle": ("supplymind.skills.pricing.lifecycle.main", "PricingLifecycle"),
+        "pricing-bundling": ("supplymind.skills.pricing.bundling.main", "PricingBundling"),
+        # Fulfillment Skills (Phase 3)
+        "fulfill-allocation": ("supplymind.skills.fulfillment.allocation.main", "FulfillmentAllocation"),
+        "fulfill-routing": ("supplymind.skills.fulfillment.routing.main", "FulfillmentRouting"),
+        "fulfill-wave": ("supplymind.skills.fulfillment.wave.main", "FulfillmentWave"),
+        "fulfill-capacity": ("supplymind.skills.fulfillment.capacity.main", "FulfillmentCapacity"),
+        # Common Skills (Phase 3)
+        "what-if": ("supplymind.skills.common.what_if.main", "WhatIfSimulator"),
     }
 
     if skill_name not in skill_map:
