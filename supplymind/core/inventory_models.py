@@ -66,6 +66,7 @@ class PolicySimResult:
     total_cost: float
     inventory_history: list[float] = field(default_factory=list)
     order_history: list[float] = field(default_factory=list)
+    policy_name: str = ""
 
 
 # ──────────────────────────────────────────────

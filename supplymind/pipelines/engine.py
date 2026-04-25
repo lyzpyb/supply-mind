@@ -93,13 +93,25 @@ def _get_skill_instance(skill_name: str):
 
     # Try importing from known locations
     skill_map = {
+        # Common Skills
         "data-profiler": ("supplymind.skills.common.data_profiler.main", "DataProfiler"),
+        "report-generator": ("supplymind.skills.common.report_generator.main", "ReportGenerator"),
+        # Demand Skills (Phase 1)
         "demand-forecast": ("supplymind.skills.demand.forecast.main", "DemandForecast"),
         "demand-anomaly": ("supplymind.skills.demand.anomaly.main", "DemandAnomaly"),
+        # Demand Skills (Phase 2)
+        "demand-decompose": ("supplymind.skills.demand.decompose.main", "DemandDecompose"),
+        "demand-newproduct": ("supplymind.skills.demand.newproduct.main", "DemandNewProduct"),
+        "demand-intermittent": ("supplymind.skills.demand.intermittent.main", "DemandIntermittent"),
+        "demand-reconcile": ("supplymind.skills.demand.reconcile.main", "DemandReconcile"),
+        # Inventory Skills (Phase 1)
         "inventory-classify": ("supplymind.skills.inventory.classify.main", "InventoryClassify"),
         "inventory-safety-stock": ("supplymind.skills.inventory.safety_stock.main", "InventorySafetyStock"),
         "inventory-reorder": ("supplymind.skills.inventory.reorder.main", "InventoryReorder"),
-        "report-generator": ("supplymind.skills.common.report_generator.main", "ReportGenerator"),
+        # Inventory Skills (Phase 2)
+        "inventory-policy-sim": ("supplymind.skills.inventory.policy_sim.main", "InventoryPolicySim"),
+        "inventory-multi-echelon": ("supplymind.skills.inventory.multi_echelon.main", "InventoryMultiEchelon"),
+        "inventory-newsvendor": ("supplymind.skills.inventory.newsvendor.main", "InventoryNewsvendor"),
     }
 
     if skill_name not in skill_map:

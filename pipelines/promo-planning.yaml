@@ -1,0 +1,70 @@
+# Promotional Event Planning Pipeline
+# Purpose: Plan inventory for promotional events with demand spikes
+# Uses: Anomaly Detection + Demand Decompose + Reconcile + Newsvendor
+
+name: promo-planning
+description: "Inventory planning for promotional events and campaigns"
+params:
+  promo_start_date: ""
+  promo_duration_days: 14
+  expected_lift_pct: 50
+  promo_type: ""  # flash_sale, bundle, discount, BOGO
+
+steps:
+  - skill: data-profiler
+    name: profile_historical_promos
+    output: $profiled
+    params:
+      profile_type: full
+
+  - skill: demand-anomaly
+    name: detect_promo_anomalies
+    input: $profiled
+    output: $anomalies
+    params:
+      sensitivity: high
+      lookback_period: 365
+
+  - skill: demand-decompose
+    name: decompose_seasonal_patterns
+    input: $anomalies
+    output: $decomposed
+    params:
+      period: 7
+
+  - skill: demand-forecast
+    name: forecast_baseline_demand
+    input: $decomposed
+    output: $baseline_fcst
+    params:
+      method: holt_winters
+      horizon: 21
+
+  - skill: demand-reconcile
+    name: reconcile_with_promo_target
+    input: $baseline_fcst
+    output: $reconciled
+    params:
+      method: top_down
+      # top_level_forecast should be set to expected promo volume
+    hitl:
+      level: collaborate
+      reason: "Promotional volume targets need alignment between marketing and supply chain"
+
+  - skill: inventory-newsvendor
+    name: optimize_promo_order_qty
+    input: $reconciled
+    output: $promo_orders
+    params:
+      # Selling price, cost, salvage value per SKU
+    hitl:
+      level: collaborate
+      reason: "Promotional order quantities directly impact margin"
+
+  - skill: report-generator
+    name: generate_promo_plan_report
+    input: $promo_orders
+    output: $promo_report
+    params:
+      title: "Promotional Event Inventory Plan"
+      format: html

@@ -1,0 +1,56 @@
+# New Store Launch Pipeline
+# Purpose: Forecast demand for a new store location using similarity-based methods
+# Uses: Demand Decomposition + New Product Forecasting + Multi-Echelon Optimization
+
+name: new-store-launch
+description: "Demand planning and inventory setup for a new store opening"
+params:
+  store_id: ""
+  reference_store: ""   # Most similar existing store
+  launch_date: ""
+  horizon_days: 90
+  initial_inventory_budget: 0
+
+steps:
+  - skill: data-profiler
+    name: profile_reference_data
+    output: $profiled
+    params:
+      profile_type: full
+
+  - skill: demand-decompose
+    name: decompose_reference_patterns
+    input: $profiled
+    output: $decomposed
+    params:
+      period: 7
+
+  - skill: demand-newproduct
+    name: forecast_new_store_demand
+    input: $decomposed
+    output: $new_store_forecast
+    params:
+      method: similarity
+      horizon: 90
+      ramp_up_weeks: 6
+    hitl:
+      level: review
+      reason: "New store forecasts need validation"
+
+  - skill: inventory-multi-echelon
+    name: optimize_network_inventory
+    input: $new_store_forecast
+    output: $echelon_plan
+    params:
+      target_service_level: 0.93
+    hitl:
+      level: collaborate
+      reason: "Network-wide inventory impact requires approval"
+
+  - skill: report-generator
+    name: generate_launch_report
+    input: $echelon_plan
+    output: $report
+    params:
+      title: "New Store Launch Plan"
+      format: html

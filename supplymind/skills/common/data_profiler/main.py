@@ -133,17 +133,33 @@ class DataProfiler:
         return SupplyMindData()
 
     def _dict_to_data(self, data_dict: dict) -> SupplyMindData:
-        """Convert a raw dict to SupplyMindData (basic conversion)."""
+        """Convert a raw dict to SupplyMindData (basic conversion).
+
+        Handles sparse input by filling in sensible defaults for required fields.
+        """
+        from datetime import date as _date
+
         data = SupplyMindData()
-        # Basic dict → data conversion
-        if "demand_history" in data_dict:
-            for r in data_dict["demand_history"]:
-                try:
-                    data.demand_history.append(
-                        DemandRecord(**r) if isinstance(r, dict) else r
-                    )
-                except Exception:
-                    pass
+        if "demand_history" not in data_dict:
+            return data
+
+        for i, r in enumerate(data_dict["demand_history"]):
+            if not isinstance(r, dict):
+                continue
+            try:
+                # Fill missing required fields with defaults
+                record = DemandRecord(
+                    sku_id=r.get("sku_id", f"unknown_{i}"),
+                    location_id=r.get("location_id", "DEFAULT"),
+                    demand_date=r.get("date", r.get("demand_date", _date.today())),
+                    quantity=float(r.get("quantity", 0)),
+                    revenue=r.get("revenue"),
+                    is_promo=r.get("is_promo"),
+                    stockout_flag=r.get("stockout_flag"),
+                )
+                data.demand_history.append(record)
+            except (ValueError, TypeError):
+                pass
         return data
 
     def _compute_sku_stats(self, data: SupplyMindData) -> list[dict]:

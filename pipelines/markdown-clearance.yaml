@@ -1,0 +1,33 @@
+# Markdown/Clearance Pricing Pipeline
+# Purpose: Identify slow-moving inventory and suggest optimal markdown prices
+# Uses: Newsvendor model for single-period optimization
+
+name: markdown-clearance
+description: "End-of-season clearance pricing optimization"
+params:
+  target_margin: 0.15
+  max_markdown: 0.60
+  service_level: 0.85
+
+steps:
+  - skill: data-profiler
+    name: profile_inventory
+    output: $profiled
+    params:
+      profile_type: full
+
+  - skill: inventory-classify
+    name: classify_slow_movers
+    input: $profiled
+    output: $classify
+    hitl:
+      level: review
+      reason: "Review classification of slow-moving items"
+
+  - skill: inventory-newsvendor
+    name: optimize_clearance_pricing
+    input: $classify
+    output: $clearance
+    hitl:
+      level: collaborate
+      reason: "Critical pricing decisions require human review"

@@ -54,7 +54,7 @@ class DomainMemory:
             "data_profile": {},
             "parameter_prefs": {},
             "model_performance": {},
-            "anomaly_patterns": {},
+            "anomaly_patterns": [],
             "metadata": {
                 "project_id": self.project_id,
                 "created_at": datetime.now().isoformat(),
@@ -180,7 +180,7 @@ class DomainMemory:
         """Clear all domain memory."""
         self._data = {
             "data_profile": {}, "parameter_prefs": {},
-            "model_performance": {}, "anomaly_patterns": {},
+            "model_performance": {}, "anomaly_patterns": [],
             "metadata": {"project_id": self.project_id, "cleared_at": datetime.now().isoformat()},
         }
         self._save()

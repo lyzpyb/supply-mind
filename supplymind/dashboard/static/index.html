@@ -49,8 +49,20 @@
         .status-dot.error { background: var(--danger); }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
+        /* Tabs */
+        .tabs { display: flex; gap: 0; background: white; border-bottom: 2px solid var(--border); padding: 0 24px; overflow-x: auto;}
+        .tab {
+            padding: 14px 20px; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+            color: var(--text-muted); border-bottom: 3px solid transparent;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .tab:hover { color: var(--primary); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
         /* Main */
         .main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
         /* Cards */
         .card {
@@ -70,6 +82,7 @@
         /* Grid */
         .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
         .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 
         /* Stat cards */
         .stat-card {
@@ -87,11 +100,11 @@
         th { background: #f1f5f9; font-weight: 600; color: var(--text-muted); }
         tr:hover { background: #f8fafc; }
 
-        /* Urgency badges */
-        .urgency-high { background: #fef2f2; color: var(--danger); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-        .urgency-medium { background: #fffbeb; color: var(--warning); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-        .urgency-low { background: #f0fdf4; color: var(--success); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-        .urgency-none { background: #f1f5f9; color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+        /* Badges */
+        .badge-high { background: #fef2f2; color: var(--danger); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .badge-medium { background: #fffbeb; color: var(--warning); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .badge-low { background: #f0fdf4; color: var(--success); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .badge-info { background: #eff6ff; color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
 
         /* Progress bar */
         .progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
@@ -106,8 +119,10 @@
         }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-sm { padding: 6px 14px; font-size: 0.82rem; }
         .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
-        .btn-outline:hover { background: var(--primary); color: white; }
 
         /* Pipeline steps */
         .step-item {
@@ -127,15 +142,51 @@
         .step-name { font-weight: 600; font-size: 0.9rem; }
         .step-detail { font-size: 0.8rem; color: var(--text-muted); }
 
+        /* Memory panel */
+        .memory-layer {
+            border-left: 3px solid var(--primary);
+            padding: 12px 16px; margin-bottom: 12px;
+            background: #f8fafc; border-radius: 0 8px 8px 0;
+        }
+        .memory-layer h4 { font-size: 0.95rem; margin-bottom: 6px; }
+        .memory-layer p { font-size: 0.85rem; color: var(--text-muted); }
+        .memory-stat { display: inline-block; margin-right: 16px; font-size: 0.85rem; }
+        .memory-stat strong { color: var(--primary); }
+
+        /* Decision item */
+        .decision-item {
+            display: flex; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border);
+            align-items: flex-start;
+        }
+        .decision-type { font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
+        .decision-approved { background: #dcfce7; color: var(--success); }
+        .decision-rejected { background: #fee2e2; color: var(--danger); }
+        .decision-adjusted { background: #fef3c7; color: var(--warning); }
+        .decision-detail { flex: 1; }
+        .decision-skill { font-weight: 600; font-size: 0.9rem; }
+        .decision-time { font-size: 0.78rem; color: var(--text-muted); }
+
+        /* Pending approval card */
+        .pending-card {
+            border: 1px solid var(--border); border-radius: 8px;
+            padding: 16px; margin-bottom: 12px;
+            transition: box-shadow 0.2s;
+        }
+        .pending-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .pending-level { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        .level-review { color: var(--warning); }
+        .level-collaborate { color: #7c3aed; }
+        .pending-actions { display: flex; gap: 8px; margin-top: 12px; }
+
         /* Footer */
         .footer { text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.85rem; }
         .footer a { color: var(--primary); text-decoration: none; }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .grid-4 { grid-template-columns: repeat(2, 1fr); }
-            .grid-2 { grid-template-columns: 1fr; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .header { flex-direction: column; gap: 12px; text-align: center; }
+            .tabs { padding: 0 12px; }
         }
     </style>
 </head>
@@ -144,8 +195,8 @@
 <!-- Header -->
 <div class="header">
     <h1>
-        🔗 SupplyMind
-        <span style="display:block;margin-top:4px">供应链计划 Agent 框架</span>
+        SupplyMind
+        <span style="display:block;margin-top:4px">Skill-based Supply Chain Planning Agent Framework</span>
     </h1>
     <div class="status-badge" id="global-status">
         <span class="status-dot ready"></span>
@@ -153,25 +204,38 @@
     </div>
 </div>
 
+<!-- Navigation Tabs -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('pipeline')">Pipeline</div>
+    <div class="tab" onclick="switchTab('memory')">Memory Insights</div>
+    <div class="tab" onclick="switchTab('decisions')">Decision History</div>
+    <div class="tab" onclick="switchTab('approvals')">Pending Approvals</div>
+</div>
+
 <div class="main">
+
+<!-- ═════════════════════════════════════════ -->
+<!-- TAB 1: Pipeline Execution                -->
+<!-- ═════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-pipeline">
 
     <!-- Stats Overview -->
     <div class="grid-4" id="stats-grid">
         <div class="stat-card">
             <div class="stat-value" id="stat-skus">--</div>
-            <div class="stat-label">SKU 数量</div>
+            <div class="stat-label">SKUs</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="stat-records">--</div>
-            <div class="stat-label">数据记录数</div>
+            <div class="stat-label">Records</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="stat-quality">--</div>
-            <div class="stat-label">数据质量分</div>
+            <div class="stat-label">Data Quality</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="stat-steps">--</div>
-            <div class="stat-label">Pipeline 步骤</div>
+            <div class="stat-label">Steps</div>
         </div>
     </div>
 
@@ -179,55 +243,48 @@
     <div class="card">
         <div class="card-header">
             <div>
-                <div class="card-title">🚀 Pipeline 执行</div>
-                <div class="card-subtitle">retail-replenish — 零售日常补货流程</div>
+                <div class="card-title">Pipeline Execution</div>
+                <div class="card-subtitle">retail-replenish — Daily Replenishment Flow</div>
             </div>
-            <button class="btn btn-primary" onclick="runPipeline()">▶ 运行 Pipeline</button>
+            <button class="btn btn-primary" onclick="runPipeline()">Run Pipeline</button>
         </div>
         <div class="progress-bar" style="margin-bottom:16px">
             <div class="progress-fill" id="pipeline-progress" style="width:0%"></div>
         </div>
         <div id="pipeline-steps">
-            <div class="step-item"><div class="step-icon step-pending">1</div><div class="step-info"><div class="step-name">Data Profiler</div><div class="step-detail">数据质量分析</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">2</div><div class="step-info"><div class="step-name">Anomaly Detection</div><div class="step-detail">异常检测与清洗</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">3</div><div class="step-info"><div class="step-name">Demand Forecast</div><div class="step-detail">需求预测 (14天)</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">4</div><div class="step-info"><div class="step-name">ABC-XYZ Classification</div><div class="step-detail">库存分类</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">5</div><div class="step-info"><div class="step-name">Safety Stock</div><div class="step-detail">安全库存计算</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">6</div><div class="step-info"><div class="step-name">Reorder Suggestions</div><div class="step-detail">补货建议生成</div></div></div>
-            <div class="step-item"><div class="step-icon step-pending">7</div><div class="step-info"><div class="step-name">Report Generation</div><div class="step-detail">报告输出</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">1</div><div class="step-info"><div class="step-name">Data Profiler</div><div class="step-detail">Quality analysis & profiling</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">2</div><div class="step-info"><div class="step-name">Anomaly Detection</div><div class="step-detail">Detect & clean anomalies</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">3</div><div class="step-info"><div class="step-name">Demand Forecast</div><div class="step-detail">Forecast (14-day horizon)</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">4</div><div class="step-info"><div class="step-name">ABC-XYZ Classification</div><div class="step-detail">Inventory classification</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">5</div><div class="step-info"><div class="step-name">Safety Stock</div><div class="step-detail">Calculate safety stock</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">6</div><div class="step-info"><div class="step-name">Reorder Suggestions</div><div class="step-detail">Generate reorder plan</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">7</div><div class="step-info"><div class="step-name">Report Generation</div><div class="step-detail">Output report</div></div></div>
         </div>
     </div>
 
     <!-- Results Grid -->
     <div class="grid-2">
-        <!-- Reorder Suggestions -->
         <div class="card">
             <div class="card-header">
-                <div class="card-title">🚛 补货建议</div>
-                <span class="card-subtitle" id="reorder-count">等待执行...</span>
+                <div class="card-title">Reorder Suggestions</div>
+                <span class="card-subtitle" id="reorder-count">Waiting...</span>
             </div>
             <table>
-                <thead>
-                    <tr><th>SKU</th><th>当前库存</th><th>建议补货</th><th>紧急度</th><th>预计成本</th></tr>
-                </thead>
+                <thead><tr><th>SKU</th><th>Stock</th><th>Order Qty</th><th>Urgency</th><th>Est. Cost</th></tr></thead>
                 <tbody id="reorder-table-body">
-                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">运行 Pipeline 后显示数据</td></tr>
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Run pipeline to see results</td></tr>
                 </tbody>
             </table>
         </div>
-
-        <!-- Forecast Summary -->
         <div class="card">
             <div class="card-header">
-                <div class="card-title">📈 预测概览</div>
-                <span class="card-subtitle" id="forecast-count">等待执行...</span>
+                <div class="card-title">Forecast Summary</div>
+                <span class="card-subtitle" id="forecast-count">Waiting...</span>
             </div>
             <table>
-                <thead>
-                    <tr><th>SKU</th><th>方法</th><th>预测总量</th><th>MAPE%</th><th>置信度</th></tr>
-                </thead>
+                <thead><tr><th>SKU</th><th>Method</th><th>Total Pred.</th><th>MAPE%</th><th>Confidence</th></tr></thead>
                 <tbody id="forecast-table-body">
-                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">运行 Pipeline 后显示数据</td></tr>
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Run pipeline to see results</td></tr>
                 </tbody>
             </table>
         </div>
@@ -235,30 +292,160 @@
 
     <!-- ABC-XYZ Matrix -->
     <div class="card">
-        <div class="card-header">
-            <div class="card-title">🏷️ ABC-XYZ 分类矩阵</div>
-        </div>
+        <div class="card-header"><div class="card-title">ABC-XYZ Classification Matrix</div></div>
         <table style="max-width:500px;margin:0 auto">
-            <thead>
-                <tr><th></th><th>X (稳定)</th><th Y (中等)</th><th>Z (波动)</th></tr>
-            </thead>
+            <thead><tr><th></th><th>X (Stable)</th><th>Y (Moderate)</th><th>Z (Volatile)</th></tr></thead>
             <tbody id="abcxyz-body">
-                <tr><td><strong>A (高价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
-                <tr><td><strong>B (中价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
-                <tr><td><strong>C (低价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+                <tr><td><strong>A (High Value)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+                <tr><td><strong>B (Medium Value)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+                <tr><td><strong>C (Low Value)</strong></td><td>--</td><td>--</td><td>--</td></tr>
             </tbody>
         </table>
     </div>
+</div>
+
+<!-- ═════════════════════════════════════════ -->
+<!-- TAB 2: Memory Insights                  -->
+<!-- ═════════════════════════════════════════ -->
+<div class="tab-content" id="tab-memory">
+    <div class="grid-3" id="memory-stats-grid">
+        <div class="stat-card" style="border-left-color:#7c3aed">
+            <div class="stat-value" id="mem-working-items">--</div>
+            <div class="stat-label">Working Memory Items</div>
+        </div>
+        <div class="stat-card" style="border-left-color:#2563eb">
+            <div class="stat-value" id="mem-domain-entries">--</div>
+            <div class="stat-label">Domain Entries</div>
+        </div>
+        <div class="stat-card" style="border-left-color:#16a34a">
+            <div class="stat-value" id="mem-decisions">--</div>
+            <div class="stat-label">Decisions Recorded</div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Domain Memory Details -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Domain Memory</div>
+                <button class="btn btn-sm btn-outline" onclick="loadMemoryDetails()">Refresh</button>
+            </div>
+            <div id="domain-memory-content">
+                <p style="color:var(--text-muted)">Loading domain memory...</p>
+            </div>
+        </div>
+
+        <!-- Meta Memory Details -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Meta Memory</div>
+                <button class="btn btn-sm btn-outline" onclick="loadMetaMemory()">Refresh</button>
+            </div>
+            <div id="meta-memory-content">
+                <p style="color:var(--text-muted)">Loading meta memory...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evolution Profiles -->
+    <div class="card">
+        <div class="card-header"><div class="card-title">Skill Evolution Profiles</div></div>
+        <div id="evolution-content">
+            <p style="color:var(--text-muted)">Loading evolution data...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ═════════════════════════════════════════ -->
+<!-- TAB 3: Decision History                 -->
+<!-- ═════════════════════════════════════════ -->
+<div class="tab-content" id="tab-decisions">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Recent Decisions</div>
+            <button class="btn btn-sm btn-outline" onclick="loadDecisions()">Refresh</button>
+        </div>
+        <div id="decisions-list">
+            <p style="color:var(--text-muted);padding:20px;text-align:center">Loading decision history...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ═════════════════════════════════════════ -->
+<!-- TAB 4: Pending Approvals               -->
+<!-- ═════════════════════════════════════════ -->
+<div class="tab-content" id="tab-approvals">
+    <div class="grid-4" id="approval-stats">
+        <div class="stat-card" style="border-left-color:#d97706">
+            <div class="stat-value" id="pending-count">--</div>
+            <div class="stat-label">Pending Approvals</div>
+        </div>
+        <div class="stat-card" style="border-left-color:#16a34a">
+            <div class="stat-value" id="approved-today">--</div>
+            <div class="stat-label">Approved Today</div>
+        </div>
+        <div class="stat-card" style="border-left-color:#dc2626">
+            <div class="stat-value" id="rejected-today">--</div>
+            <div class="stat-label">Rejected Today</div>
+        </div>
+        <div class="stat-card" style="border-left-color:#2563eb">
+            <div class="stat-value" id="adoption-rate">--</div>
+            <div class="stat-label">Adoption Rate</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Pending Approvals</div>
+            <button class="btn btn-primary btn-sm" onclick="loadApprovals()">Check Pending</button>
+        </div>
+        <div id="approvals-list">
+            <p style="color:var(--text-muted);padding:20px;text-align:center">Click "Check Pending" to load approvals...</p>
+        </div>
+    </div>
+</div>
 
 </div>
 
 <div class="footer">
-    SupplyMind v0.1.0 — Skill-based Supply Chain Planning Agent Framework |
-    <a href="https://github.com/user/supply-mind">GitHub</a>
+    SupplyMind v0.2.0 — Skill-based Supply Chain Planning Agent Framework |
+    Phase 2 Enhanced Dashboard
 </div>
 
 <script>
-// ── Mock data for demo ──
+// ── Tab Switching ──
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tabName).classList.add('active');
+
+    // Load tab-specific data
+    if (tabName === 'memory') loadAllMemory();
+    if (tabName === 'decisions') loadDecisions();
+    if (tabName === 'approvals') loadApprovals();
+}
+
+// ── API Helper ──
+async function api(path, options) {
+    try {
+        const resp = await fetch(path, options);
+        if (!resp.ok) {
+            // Non-2xx response — may be HTML error page
+            const ct = resp.headers.get('Content-Type') || '';
+            if (ct.includes('application/json')) {
+                return await resp.json();
+            }
+            const text = await resp.text();
+            return {error: `HTTP ${resp.status}: ${text.substring(0, 200)}`};
+        }
+        return await resp.json();
+    } catch(e) {
+        return {error: e.message};
+    }
+}
+
+// ── Pipeline Demo ──
 const mockReorders = [
     {sku:'SKU001', stock:280, order:420, urgency:'high', cost:8400},
     {sku:'SKU002', stock:120, order:180, urgency:'medium', cost:1440},
@@ -266,7 +453,6 @@ const mockReorders = [
     {sku:'SKU004', stock:65, order:150, urgency:'high', cost:600},
     {sku:'SKU005', stock:150, order:180, urgency:'medium', cost:3240},
 ];
-
 const mockForecasts = [
     {sku:'SKU001', method:'holt_winters', total:1980, mape:8.2, conf:0.92},
     {sku:'SKU002', method:'ema', total:850, mape:11.5, conf:0.85},
@@ -274,59 +460,34 @@ const mockForecasts = [
     {sku:'SKU004', method:'holt_winters', total:380, mape:18.1, conf:0.72},
     {sku:'SKU005', method:'ema', total:520, mape:13.7, conf:0.80},
 ];
-
-const mockABCXYZ = {
-    'AX':5,'AY':2,'AZ':0,
-    'BX':3,'BY':4,'BZ':1,
-    'CX':2,'CY':3,'CZ':5,
-};
+const mockABCXYZ = {'AX':5,'AY':2,'AZ':0,'BX':3,'BY':4,'BZ':1,'CX':2,'CY':3,'CZ':5};
 
 function runPipeline() {
     const statusBadge = document.getElementById('global-status');
     const statusText = document.getElementById('status-text');
     const progressFill = document.getElementById('pipeline-progress');
-    const steps = document.querySelectorAll('.step-item');
+    const steps = document.querySelectorAll('#pipeline-steps .step-item');
 
     statusBadge.innerHTML = '<span class="status-dot running"></span><span>Running...</span>';
     statusText.textContent = 'Running';
 
-    // Animate through steps
-    const stepDelays = [300, 800, 1500, 2200, 2900, 3600, 4300];
-    const totalDuration = 5000;
-
     let currentStep = 0;
-
     function animateStep() {
         if (currentStep >= steps.length) {
-            // Complete
-            statusBadge.innerHTML = '<span class="status-dot ready"></span><span>Completed ✓</span>';
-            fillResults();
-            return;
+            statusBadge.innerHTML = '<span class="status-dot ready"></span><span>Completed</span>';
+            fillResults(); return;
         }
-
-        // Mark previous as completed
         if (currentStep > 0) {
             const prevIcon = steps[currentStep - 1].querySelector('.step-icon');
-            prevIcon.className = 'step-icon step-completed';
-            prevIcon.textContent = '✓';
+            prevIcon.className = 'step-icon step-completed'; prevIcon.textContent = '\u2713';
         }
-
-        // Mark current as running
         const icon = steps[currentStep].querySelector('.step-icon');
-        icon.className = 'step-icon step-running';
-        icon.textContent = '⏳';
-
+        icon.className = 'step-icon step-running'; icon.textContent = '\u23F3';
         progressFill.style.width = ((currentStep + 1) / steps.length * 100) + '%';
-
-        setTimeout(() => {
-            currentStep++;
-            animateStep();
-        }, stepDelays[currentStep] || 500);
+        setTimeout(() => { currentStep++; animateStep(); }, [300,800,1500,2200,2900,3600,4300][currentStep] || 500);
     }
-
     animateStep();
 
-    // Update stats
     document.getElementById('stat-skus').textContent = '5';
     document.getElementById('stat-records').textContent = '~900';
     document.getElementById('stat-quality').textContent = '82';
@@ -334,40 +495,210 @@ function runPipeline() {
 }
 
 function fillResults() {
-    // Fill reorder table
     const tbody = document.getElementById('reorder-table-body');
-    tbody.innerHTML = mockReorders.map(r => `
-        <tr>
-            <td><strong>${r.sku}</strong></td>
-            <td>${r.stock}</td>
-            <td>${r.order}</td>
-            <td><span class="urgency-${r.urgency}">${r.urgency.toUpperCase()}</span></td>
-            <td>¥${r.cost.toLocaleString()}</td>
-        </tr>
-    `).join('');
-    document.getElementById('reorder-count').textContent = `${mockReorders.length} 个 SKU 需要补货`;
+    tbody.innerHTML = mockReorders.map(r => `<tr>
+        <td><strong>${r.sku}</strong></td><td>${r.stock}</td><td>${r.order}</td>
+        <td><span class="badge-${r.urgency==='high'?'high':r.urgency==='medium'?'medium':'low'}">${r.urgency.toUpperCase()}</span></td>
+        <td>$${r.cost.toLocaleString()}</td></tr>`).join('');
+    document.getElementById('reorder-count').textContent = `${mockReorders.length} SKUs need reorder`;
 
-    // Fill forecast table
     const fbody = document.getElementById('forecast-table-body');
-    fbody.innerHTML = mockForecasts.map(f => `
-        <tr>
-            <td><strong>${f.sku}</strong></td>
-            <td>${f.method.replace('_',' ')}</td>
-            <td>${f.total.toLocaleString()}</td>
-            <td>${f.mape}%</td>
-            <td>${'█'.repeat(Math.round(f.conf * 8))} ${Math.round(f.conf*100)}%</td>
-        </tr>
-    `).join('');
-    document.getElementById('forecast-count').textContent = `${mockForecasts.length} 个 SKU 已预测`;
+    fbody.innerHTML = mockForecasts.map(f => `<tr>
+        <td><strong>${f.sku}</strong></td><td>${f.method.replace('_',' ')}</td>
+        <td>${f.total.toLocaleString()}</td><td>${f.mape}%</td>
+        <td>${'\u2588'.repeat(Math.round(f.conf*8))} ${Math.round(f.conf*100)}%</td></tr>`).join('');
+    document.getElementById('forecast-count').textContent = `${mockForecasts.length} SKUs forecasted`;
 
-    // Fill ABC-XYZ matrix
     const abody = document.getElementById('abcxyz-body');
-    abody.innerHTML = `
-        <tr><td><strong>A (高价值)</strong></td><td>${mockABCXYZ.AX}</td><td>${mockABCXYZ.AY}</td><td>${mockABCXYZ.AZ}</td></tr>
-        <tr><td><strong>B (中价值)</strong></td><td>${mockABCXYZ.BX}</td><td>${mockABCXYZ.BY}</td><td>${mockABCXYZ.BZ}</td></tr>
-        <tr><td><strong>C (低价值)</strong></td><td>${mockABCXYZ.CX}</td><td>${mockABCXYZ.CY}</td><td>${mockABCXYZ.CZ}</td></tr>
+    abody.innerHTML = `<tr><td><strong>A (High Value)</strong></td><td>${mockABCXYZ.AX}</td><td>${mockABCXYZ.AY}</td><td>${mockABCXYZ.AZ}</td></tr>
+        <tr><td><strong>B (Medium Value)</strong></td><td>${mockABCXYZ.BX}</td><td>${mockABCXYZ.BY}</td><td>${mockABCXYZ.BZ}</td></tr>
+        <tr><td><strong>C (Low Value)</strong></td><td>${mockABCXYZ.CX}</td><td>${mockABCXYZ.CY}</td><td>${mockABCXYZ.CZ}</td></tr>`;
+}
+
+// ── Memory APIs ──
+async function loadAllMemory() { loadMemoryDetails(); loadMetaMemory(); loadEvolutionProfiles(); }
+
+async function loadMemoryDetails() {
+    const data = await api('/api/memory/domain');
+    const el = document.getElementById('domain-memory-content');
+    if (data.error) { el.innerHTML = `<p style="color:var(--danger)">Error: ${data.error}</p>`; return; }
+
+    const s = data.summary || {};
+    document.getElementById('mem-domain-entries').textContent = (
+        (s.data_profile_entries||0) + (s.preference_entries||0) + (s.pattern_count||0)
+    );
+
+    el.innerHTML = `
+        <div class="memory-layer">
+            <h4>Data Profile</h4>
+            <p><span class="memory-stat"><strong>${s.data_profile_entries || 0}</strong> entries</span>
+               <span class="memory-stat"><strong>${s.model_performance_categories || 0}</strong> model categories tracked</span></p>
+        </div>
+        <div class="memory-layer" style="border-left-color:#7c3aed">
+            <h4>Parameter Preferences</h4>
+            <p>${Object.keys(data.preferences || {}).length ? Object.entries(data.preferences).map(([k,v]) =>
+                `<span class="memory-stat"><strong>${k}</strong>: ${v}</span>`).join('') : 'No preferences set yet'}</p>
+        </div>
+        <div class="memory-layer" style="border-left-color:#16a34a">
+            <h4>Anomaly Patterns</h4>
+            <p><span class="memory-stat"><strong>${s.pattern_count || 0}</strong> patterns recorded</span></p>
+        </div>
     `;
 }
+
+async function loadMetaMemory() {
+    const data = await api('/api/memory/meta');
+    const el = document.getElementById('meta-memory-content');
+    if (data.error) { el.innerHTML = `<p style="color:var(--danger)">Error: ${data.error}</p>`; return; }
+
+    document.getElementById('mem-decisions').textContent = data.decisions_count || 0;
+
+    const styles = data.user_style || {};
+    el.innerHTML = `
+        <div class="memory-layer" style="border-left-color:#7c3aed">
+            <h4>User Style Preferences</h4>
+            <p>${Object.entries(styles).map(([k,v]) =>
+                `<span class="memory-stat"><strong>${k}</strong>: ${v}</span>`).join('') || 'Default settings'}</p>
+        </div>
+        <div class="memory-layer" style="border-left-color:#2563eb">
+            <h4>Skill Usage</h4>
+            <p><span class="memory-stat"><strong>${data.skills_tracked || 0}</strong> skills tracked</span></p>
+        </div>
+        <div class="memory-layer" style="border-left-color:#d97706">
+            <h4>Cross-Project Learnings</h4>
+            <p><span class="memory-stat"><strong>${data.learnings_stored || 0}</strong> learnings stored</span></p>
+        </div>
+        <div class="memory-layer" style="border-left-color:#16a34a">
+            <h4>Global Defaults</h4>
+            <p>${Object.entries(data.global_defaults || {}).map(([k,v]) =>
+                `<span class="memory-stat"><strong>${k}</strong>: ${v}</span>`).join('') || 'Using defaults'}</p>
+        </div>
+    `;
+}
+
+async function loadEvolutionProfiles() {
+    const data = await api('/api/evolution/profiles');
+    const el = document.getElementById('evolution-content');
+    if (data.error) { el.innerHTML = `<p>Error: ${data.error}</p>`; return; }
+
+    const profiles = data.profiles || [];
+    if (!profiles.length) {
+        el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">No evolution profiles yet. Run pipelines and provide feedback to build evolution history.</p>';
+        return;
+    }
+
+    el.innerHTML = profiles.map(p => `
+        <div class="memory-layer" style="border-left-color:#2563eb">
+            <h4>${p.skill || 'Unknown Skill'}</h4>
+            <p>
+                <span class="memory-stat"><strong>${p.total_executions || 0}</strong> executions</span>
+                <span class="memory-stat"><strong>${p.methods_tracked || 0}</strong> methods tracked</span>
+                <span class="memory-stat"><strong>${p.corrections_received || 0}</strong> corrections</span>
+                <span class="memory-stat"><strong>${p.active_rules || 0}</strong> auto-rules</span>
+            </p>
+        </div>
+    `).join('');
+}
+
+// ── Decision History ──
+async function loadDecisions() {
+    const data = await api('/api/decisions/history?limit=30');
+    const el = document.getElementById('decisions-list');
+    if (data.error) { el.innerHTML = `<p style="color:var(--danger)">Error: ${data.error}</p>`; return; }
+
+    const decisions = data.decisions || [];
+    if (!decisions.length) {
+        el.innerHTML = '<p style="color:var(--text-muted);padding:20px;text-align:center">No decisions recorded yet. Run pipelines with HITL enabled.</p>';
+        return;
+    }
+
+    el.innerHTML = decisions.map(d => {
+        const typeClass = d.decision_type === 'approved' ? 'decision-approved' :
+                           d.decision_type === 'rejected' ? 'decision-rejected' : 'decision-adjusted';
+        return `<div class="decision-item">
+            <span class="decision-type ${typeClass}">${d.decision_type.toUpperCase()}</span>
+            <div class="decision-detail">
+                <div class="decision-skill">${d.skill || 'Unknown'} — ${d.summary?.substring(0, 80) || ''}</div>
+                <div class="decision-time">${d.timestamp || ''} | confidence: ${(d.confidence * 100).toFixed(0)}%</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Pending Approvals ──
+async function loadApprovals() {
+    const [pendingData, feedbackData] = await Promise.all([
+        api('/api/hitl/pending'),
+        api('/api/feedback/summary'),
+    ]);
+
+    // Update stats
+    const pending = pendingData.pending || [];
+    document.getElementById('pending-count').textContent = pending.length;
+
+    const fb = feedbackData.by_type || {};
+    const approved = (fb.explicit_thumbs_up || 0) + (fb.implicit_adopt || 0);
+    const rejected = (fb.explicit_thumbs_down || 0) + (fb.implicit_reject || 0);
+    document.getElementById('approved-today').textContent = approved;
+    document.getElementById('rejected-today').textContent = rejected;
+    document.getElementById('adoption-rate').textContent =
+        ((feedbackData.overall_adoption_rate || 0) * 100).toFixed(0) + '%';
+
+    // Render pending list
+    const el = document.getElementById('approvals-list');
+    if (!pending.length) {
+        el.innerHTML = '<p style="color:var(--text-muted);padding:20px;text-align:center">No pending approvals. All clear!</p>';
+        return;
+    }
+
+    el.innerHTML = pending.map(p => {
+        const levelClass = p.level === 'collaborate' ? 'level-collaborate' : 'level-review';
+        return `<div class="pending-card">
+            <div style="display:flex;justify-content:space-between;align-items:start">
+                <div>
+                    <span class="pending-level ${levelClass}">${p.level} Level</span>
+                    <h4 style="margin:6px 0 2px;font-size:1rem">${p.title || p.step_name || 'Untitled'}</h4>
+                    <p style="font-size:0.85rem;color:var(--text-muted)">${p.summary || p.skill || ''}</p>
+                    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${p.created_at || ''}</p>
+                </div>
+                <span class="badge-info">${p.skill || ''}</span>
+            </div>
+            <div class="pending-actions">
+                <button class="btn btn-success btn-sm" onclick="approveSession('${p.id}')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectSession('${p.id}')">Reject</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function approveSession(id) {
+    const result = await fetch('/api/hitl/approve', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({session_id: id, reason: 'Approved via Dashboard'}),
+    }).then(r => r.json());
+    alert(result.success ? 'Approved!' : 'Error: ' + (result.error || 'Unknown'));
+    loadApprovals();
+}
+
+async function rejectSession(id) {
+    const result = await fetch('/api/hitl/reject', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({session_id: id, reason: 'Rejected via Dashboard'}),
+    }).then(r => r.json());
+    alert(result.success ? 'Rejected.' : 'Error: ' + (result.error || 'Unknown'));
+    loadApprovals();
+}
+
+// ── Init: Load memory insights on page load ──
+document.addEventListener('DOMContentLoaded', () => {
+    api('/api/memory/insights').then(data => {
+        if (!data.error && data.working) {
+            document.getElementById('mem-working-items').textContent = data.working.items || 0;
+        }
+    });
+});
 </script>
 
 </body>

@@ -1,0 +1,69 @@
+# Manufacturing MRP (Material Requirements Planning) Pipeline
+# Purpose: Calculate material requirements based on production plan and BOM
+# Uses: Demand Forecast + Safety Stock + Reorder + Policy Simulation
+
+name: manufacturing-mrp
+description: "Material requirements planning for manufacturing operations"
+params:
+  planning_horizon_days: 30
+  lead_time_buffer: 1.2
+  safety_stock_multiplier: 1.5
+
+steps:
+  - skill: data-profiler
+    name: profile_production_data
+    output: $profiled
+    params:
+      profile_type: full
+
+  - skill: demand-forecast
+    name: forecast_component_demand
+    input: $profiled
+    output: $forecast
+    params:
+      method: holt_winters
+      horizon: 30
+      confidence_level: 0.95
+
+  - skill: demand-intermittent
+    name: identify_intermittent_components
+    input: $profiled
+    output: $intermittent
+    params:
+      variant: sba
+      zero_threshold: 0.4
+
+  - skill: inventory-safety-stock
+    name: calculate_safety_stock
+    input: $forecast
+    output: $safety_stock
+    params:
+      target_service_level: 0.95
+      method: stochastic
+
+  - skill: inventory-reorder
+    name: generate_reorder_plan
+    input: $safety_stock
+    output: $reorder
+    params:
+      target_service_level: 0.95
+      include_lead_time_buffer: true
+    hitl:
+      level: review
+      reason: "MRP reorder quantities need review before PO creation"
+
+  - skill: inventory-policy-sim
+    name: simulate_policy_performance
+    input: $reorder
+    output: $simulation
+    params:
+      n_periods: 180
+      n_simulations: 50
+
+  - skill: report-generator
+    name: generate_mrp_report
+    input: $simulation
+    output: $mrp_report
+    params:
+      title: "Manufacturing MRP Report"
+      format: markdown
