@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" alt="License" />
-  <img src="https://img.shields.io/badge/Tests-171%20passing-brightgreen.svg" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-231%20passing-brightgreen.svg" alt="Tests" />
   <img src="https://img.shields.io/badge/Skills-20%2B-tools-orange.svg" alt="Skills" />
   <a href="#english"><img src="https://img.shields.io/badge/lang-English-gray.svg" /></a>
   <a href="#中文"><img src="https://img.shields.io/badge/lang-中文版-red.svg" /></a>
@@ -356,7 +356,7 @@ supply-mind/
 │       ├── sku_master.csv
 │       └── inventory_snapshot.csv
 │
-└── tests/                      # Test suite (171 tests)
+└── tests/                      # Test suite (231 tests)
     ├── test_core.py            # Algorithm unit tests
     ├── test_protocol.py        # Schema & validator tests
     ├── test_phase2.py          # Phase 2 integration (demand/inventory expansion)
@@ -416,7 +416,7 @@ supply-mind/
 - [x] OpenAI function-calling format export
 - [x] SKILL.md — agent-facing skill description
 - [x] Parallel tool execution support
-- [x] **29 agent toolkit tests + 142 existing = 171 total passing** ✅
+- [x] **29 agent toolkit tests + 202 existing = 231 total passing** ✅
 
 ### Phase 5 📋 Next
 
@@ -434,7 +434,7 @@ pip install pytest pytest-asyncio
 # Run all tests
 pytest tests/ -v
 
-# Result: 171 passed ✅
+# Result: 231 passed ✅
 ```
 
 Test coverage:
@@ -446,7 +446,7 @@ Test coverage:
 | `test_phase2.py` | Phase 2 skills (demand expansion, inventory expansion, learning, MCP) | ~40 |
 | `test_phase3.py` | Phase 3 skills (pricing, fulfillment, what-if, LangChain adapter) | ~30 |
 | `test_agent_tools.py` | 🆕 Agent Toolkit (registry, handlers, OpenAI format, workflows) | 29 |
-| **Total** | | **~139 (+ 32 core/protocol ≈ 171)** |
+| **Total** | | **231** |
 
 ## 🤖 Integration Examples
 

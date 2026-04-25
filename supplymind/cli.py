@@ -212,5 +212,28 @@ def dashboard(host: str, port: int):
         click.echo("  Dashboard stopped.")
 
 
+@main.command("mcp-serve")
+@click.option("--transport", "-t", default="stdio", type=click.Choice(["stdio", "sse"]),
+              help="Transport protocol (default: stdio)")
+def mcp_serve(transport: str):
+    """Start the MCP server for AI assistant integration.
+
+    Exposes all 23 SupplyMind skills via Model Context Protocol.
+    Compatible with Claude Desktop, Cursor, Claude Code, etc.
+
+    \b
+    Examples:
+        supplymind mcp-serve                    # stdio (default)
+        supplymind mcp-serve --transport sse    # SSE for web clients
+    """
+    try:
+        from supplymind.mcp.server import start_mcp_server
+        start_mcp_server(transport=transport)
+    except ImportError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo("Install MCP support: pip install supplymind[mcp]", err=True)
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
     main()

@@ -27,6 +27,56 @@ from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
 
+# ── Module-level singletons ──
+
+_hitl_engine = None
+_feedback_collector = None
+_learning_loop = None
+_skill_evolution = None
+
+
+def _get_hitl_engine():
+    global _hitl_engine, _feedback_collector, _learning_loop
+    if _hitl_engine is None:
+        _feedback_collector = _get_feedback_collector()
+        _learning_loop = _get_learning_loop()
+        from supplymind.hitl.engine import HTLEngine
+        _hitl_engine = HTLEngine(
+            feedback_collector=_feedback_collector,
+            learning_loop=_learning_loop,
+        )
+    return _hitl_engine
+
+
+def _get_feedback_collector():
+    global _feedback_collector
+    if _feedback_collector is None:
+        from supplymind.hitl.feedback import FeedbackCollector
+        _feedback_collector = FeedbackCollector()
+    return _feedback_collector
+
+
+def _get_learning_loop():
+    global _learning_loop
+    if _learning_loop is None:
+        try:
+            from supplymind.learning.loop import LearningLoop
+            from supplymind.memory.domain import DomainMemory
+            dm = DomainMemory()
+            _learning_loop = LearningLoop(domain_memory=dm)
+        except Exception:
+            from supplymind.learning.loop import LearningLoop
+            _learning_loop = LearningLoop()
+    return _learning_loop
+
+
+def _get_skill_evolution():
+    global _skill_evolution
+    if _skill_evolution is None:
+        from supplymind.learning.evolution import SkillEvolution
+        _skill_evolution = SkillEvolution()
+    return _skill_evolution
+
 # Global SSE event queue for real-time updates
 _sse_subscribers: list[Callable] = []
 _pipeline_status: dict = {
@@ -221,8 +271,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _get_pending_approvals() -> dict:
         """Get pending HITL approvals."""
         try:
-            from supplymind.hitl.engine import HTLEngine
-            engine = HTLEngine()
+            engine = _get_hitl_engine()
             pending = engine.get_pending_sessions()
             return {
                 "pending": [
@@ -247,13 +296,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _handle_hitl_approve(data: dict) -> dict:
         """Approve a pending HITL session."""
         try:
-            from supplymind.hitl.engine import HTLEngine, HITLDecision
+            from supplymind.hitl.engine import HITLDecision
             from supplymind.memory.meta import MetaMemory
 
             session_id = data.get("session_id", "")
             reason = data.get("reason", "Approved via Dashboard")
 
-            engine = HTLEngine()
+            engine = _get_hitl_engine()
             session = engine.resolve(session_id, HITLDecision.APPROVED, reason)
 
             # Record in meta memory
@@ -274,13 +323,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _handle_hitl_reject(data: dict) -> dict:
         """Reject a pending HITL session."""
         try:
-            from supplymind.hitl.engine import HTLEngine, HITLDecision
+            from supplymind.hitl.engine import HITLDecision
             from supplymind.memory.meta import MetaMemory
 
             session_id = data.get("session_id", "")
             reason = data.get("reason", "Rejected via Dashboard")
 
-            engine = HTLEngine()
+            engine = _get_hitl_engine()
             session = engine.resolve(session_id, HITLDecision.REJECTED, reason)
 
             mm = MetaMemory()
@@ -300,19 +349,19 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _handle_hitl_adjust(data: dict) -> dict:
         """Adjust a pending HITL session with modified values."""
         try:
-            from supplymind.hitl.engine import HTLEngine, HITLDecision
+            from supplymind.hitl.engine import HITLDecision
             from supplymind.memory.meta import MetaMemory
-            from supplymind.hitl.feedback import FeedbackCollector, FeedbackType
 
             session_id = data.get("session_id", "")
             reason = data.get("reason", "Adjusted via Dashboard")
             adjusted_data = data.get("adjusted_data", {})
 
-            engine = HTLEngine()
+            engine = _get_hitl_engine()
             session = engine.resolve(session_id, HITLDecision.ADJUSTED, reason, adjusted_data)
 
-            # Record feedback
-            fc = FeedbackCollector()
+            # Record feedback via shared collector
+            fc = _get_feedback_collector()
+            from supplymind.hitl.feedback import FeedbackType
             fc.record(
                 session_id=session_id,
                 feedback_type=FeedbackType.IMPLICIT_ADJUST,
@@ -346,8 +395,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _get_feedback_summary() -> dict:
         """Get feedback summary statistics."""
         try:
-            from supplymind.hitl.feedback import FeedbackCollector
-            fc = FeedbackCollector()
+            fc = _get_feedback_collector()
             return fc.summary()
         except Exception as e:
             return {"error": str(e), "total_feedbacks": 0}
@@ -356,9 +404,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _handle_record_feedback(data: dict) -> dict:
         """Record a new feedback entry."""
         try:
-            from supplymind.hitl.feedback import FeedbackCollector, FeedbackType
+            from supplymind.hitl.feedback import FeedbackType
 
-            fc = FeedbackCollector()
+            fc = _get_feedback_collector()
             fc.record(
                 session_id=data.get("session_id", ""),
                 feedback_type=data.get("type", "implicit_adopt"),
@@ -380,8 +428,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _get_evolution_profiles() -> dict:
         """Get evolution profile summaries."""
         try:
-            from supplymind.learning.evolution import SkillEvolution
-            se = SkillEvolution()
+            se = _get_skill_evolution()
 
             profiles = []
             for path in se.storage_dir.glob("*_evolution.json"):

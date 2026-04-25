@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "supplymind": {
+      "command": "supplymind",
+      "args": ["mcp-serve", "--transport", "stdio"],
+      "env": {}
+    }
+  }
+}

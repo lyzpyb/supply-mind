@@ -122,38 +122,29 @@ PRICING_MARKDOWN_TOOL_SPEC = {
     "parameters": {
         "type": "object",
         "properties": {
-            "current_price": {
+            "current_stock": {
                 "type": "number",
-                "description": "Current selling price per unit",
+                "description": "Units on hand to clear",
             },
-            "cost": {
+            "unit_cost": {
                 "type": "number",
-                "description": "Unit cost (to avoid selling below cost)",
+                "description": "Per-unit cost",
             },
-            "inventory_remaining": {
-                "type": "integer",
-                "description": "Units remaining to sell",
+            "original_price": {
+                "type": "number",
+                "description": "Current/list price",
             },
-            "days_left": {
+            "days_remaining": {
                 "type": "integer",
-                "description": "Days until end of season/channel close",
+                "default": 30,
+                "description": "Days until deadline",
             },
             "elasticity": {
                 "type": "number",
                 "description": "Price elasticity (from pricing_elasticity). Default: -1.5",
             },
-            "daily_holding_cost": {
-                "type": "number",
-                "default": 0,
-                "description": "Cost to hold one unit for one day",
-            },
-            "max Markdown_depth": {
-                "type": "number",
-                "default": 0.7,
-                "description": "Maximum markdown as fraction of current price (default: 70% of price)",
-            },
         },
-        "required": ["current_price", "cost", "inventory_remaining", "days_left"],
+        "required": ["current_stock", "unit_cost", "original_price"],
     },
 }
 
@@ -165,13 +156,11 @@ async def pricing_markdown_handler(arguments: dict[str, Any]) -> tuple[str, bool
         from supplymind.skills.pricing.markdown.schema import MarkdownInput
 
         input_data = MarkdownInput(
-            current_price=arguments["current_price"],
-            cost=arguments["cost"],
-            inventory_remaining=arguments["inventory_remaining"],
-            days_left=arguments["days_left"],
+            current_stock=arguments.get("inventory_remaining") or arguments.get("current_stock", 100),
+            unit_cost=arguments.get("cost") or arguments.get("unit_cost", 5.0),
+            original_price=arguments.get("current_price") or arguments.get("original_price", 20.0),
+            days_remaining=arguments.get("days_left") or arguments.get("days_remaining", 30),
             elasticity=arguments.get("elasticity", -1.5),
-            daily_holding_cost=arguments.get("daily_holding_cost", 0),
-            max_markdown_depth=arguments.get("max_markdown_depth", 0.7),
         )
 
         skill = PricingMarkdown()

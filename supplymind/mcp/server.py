@@ -1,21 +1,25 @@
 """
-MCP Server — exposes SupplyMind capabilities via Model Context Protocol.
+MCP Server — exposes all 23 SupplyMind skills via Model Context Protocol.
 
-Provides tools for AI assistants (Claude, GPT, etc.) to call
-SupplyMind skills directly through the MCP protocol.
+Uses the official `mcp` SDK (FastMCP pattern) for full protocol compliance.
+Supports stdio and SSE transports, compatible with Claude Desktop, Cursor, etc.
 
-Tools available:
-  - demand_forecast: Generate demand forecasts
-  - demand_decompose: Decompose time series into trend/seasonal/residual
-  - inventory_classify: ABC-XYZ classification
-  - inventory_reorder: Generate reorder suggestions
-  - safety_stock: Calculate safety stock levels
-  - data_profiler: Profile and analyze input data
-  - run_pipeline: Execute a full pipeline from YAML definition
+Install: pip install supplymind[mcp]
+Run:     supplymind mcp-serve --transport stdio
+
+All 23 tools across 5 domains:
+  Common:     data_profiler, report_generator, what_if
+  Demand:     demand_forecast, demand_decompose, demand_anomaly,
+              demand_newproduct, demand_intermittent, demand_reconcile
+  Inventory:  inventory_reorder, inventory_safety_stock, inventory_policy_sim,
+              inventory_classify, inventory_multi_echelon, inventory_newsvendor
+  Pricing:    pricing_elasticity, pricing_markdown, pricing_lifecycle, pricing_bundling
+  Fulfillment: fulfill_allocation, fulfill_routing, fulfill_wave, fulfill_capacity
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import traceback
@@ -23,498 +27,369 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_MCP_AVAILABLE = False
+try:
+    from mcp.server.fastmcp import FastMCP
+    _MCP_AVAILABLE = True
+except ImportError:
+    pass
 
-class MCPServer:
-    """Lightweight MCP-compatible server for SupplyMind.
 
-    Implements a tool-calling interface that can be wrapped by any MCP SDK.
-    Uses a simple JSON-RPC-like protocol over stdio or HTTP.
-    """
-
-    def __init__(self):
-        self._tools = self._register_tools()
-        logger.info(f"MCP Server initialized with {len(self._tools)} tools")
-
-    def _register_tools(self) -> dict:
-        """Register all available MCP tools."""
-        return {
-            "demand_forecast": {
-                "description": "Generate demand forecasts using statistical models. Supports auto method selection, Holt-Winters, Croston's method, etc.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "demand_history": {
-                            "type": "array",
-                            "items": {"type": "object"},
-                            "description": "Demand records with sku_id, date, quantity fields",
-                        },
-                        "horizon": {"type": "integer", "default": 14, "description": "Forecast horizon in days"},
-                        "method": {
-                            "type": "string",
-                            "enum": ["auto", "ma", "ema", "holt_winters", "croston"],
-                            "default": "auto",
-                        },
-                        "confidence_level": {"type": "number", "default": 0.95},
-                    },
-                    "required": ["demand_history"],
-                },
-                "handler": self._handle_demand_forecast,
-            },
-            "demand_decompose": {
-                "description": "Decompose a time series into trend, seasonal, and residual components using STL decomposition.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "demand_history": {
-                            "type": "array",
-                            "items": {"type": "object"},
-                            "description": "Demand records with sku_id, date, quantity fields",
-                        },
-                        "period": {"type": "integer", "description": "Seasonal period (auto-detect if omitted)"},
-                    },
-                    "required": ["demand_history"],
-                },
-                "handler": self._handle_demand_decompose,
-            },
-            "inventory_classify": {
-                "description": "Perform ABC-XYZ matrix classification on SKUs based on revenue value and demand variability.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "items": {
-                            "type": "array",
-                            "items": {"type": "object"},
-                            "description": "Item list with item_id, revenue, demand_values fields",
-                        },
-                    },
-                    "required": ["items"],
-                },
-                "handler": self._handle_inventory_classify,
-            },
-            "inventory_reorder": {
-                "description": "Generate reorder suggestions including order quantities, timing, and reasoning.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "sku_id": {"type": "string"},
-                        "current_inventory": {"type": "number"},
-                        "demand_forecast": {"type": "array", "items": {"type": "number"}},
-                        "lead_time_days": {"type": "number", "default": 7},
-                        "service_level": {"type": "number", "default": 0.95},
-                    },
-                    "required": ["sku_id", "current_inventory", "demand_forecast"],
-                },
-                "handler": self._handle_reorder,
-            },
-            "safety_stock": {
-                "description": "Calculate optimal safety stock using service level or Monte Carlo methods.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "demand_std": {"type": "number", "description": "Daily demand standard deviation"},
-                        "lead_time_mean": {"type": "number", "description": "Mean lead time in days"},
-                        "target_service_level": {"type": "number", "default": 0.95},
-                        "method": {"type": "string", "enum": ["service_level", "monte_carlo"], "default": "service_level"},
-                    },
-                    "required": ["demand_std", "lead_time_mean"],
-                },
-                "handler": self._handle_safety_stock,
-            },
-            "data_profiler": {
-                "description": "Profile and analyze input data to detect patterns, quality issues, and characteristics.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "data": {"type": "array", "items": {"type": "object"}},
-                        "profile_type": {"type": "string", "enum": ["full", "quick"], "default": "quick"},
-                    },
-                    "required": ["data"],
-                },
-                "handler": self._handle_data_profiler,
-            },
-            "run_pipeline": {
-                "description": "Execute a full SupplyMind pipeline from a YAML definition file.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "pipeline_path": {"type": "string", "description": "Path to pipeline YAML file"},
-                        "data_path": {"type": "string", "description": "Path to input data file"},
-                    },
-                    "required": ["pipeline_path"],
-                },
-                "handler": self._handle_run_pipeline,
-            },
-            # Phase 3: Pricing tools
-            "pricing_elasticity": {
-                "description": "Estimate price elasticity using log-log OLS regression. Returns elasticity coefficient, classification, and revenue-optimal price.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "prices": {"type": "array", "items": {"type": "number"}, "description": "Historical prices"},
-                        "quantities": {"type": "array", "items": {"type": "number"}, "description": "Corresponding quantities sold"},
-                    },
-                    "required": ["prices", "quantities"],
-                },
-                "handler": self._handle_pricing_elasticity,
-            },
-            "pricing_markdown": {
-                "description": "Optimize phased markdown (clearance) pricing strategy under time pressure.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "current_stock": {"type": "number", "description": "Units on hand to clear"},
-                        "unit_cost": {"type": "number", "description": "Per-unit cost"},
-                        "original_price": {"type": "number", "description": "Current/list price"},
-                        "elasticity": {"type": "number", "default": -2.0},
-                        "days_remaining": {"type": "integer", "default": 30},
-                    },
-                    "required": ["current_stock", "unit_cost", "original_price"],
-                },
-                "handler": self._handle_pricing_markdown,
-            },
-            "pricing_lifecycle": {
-                "description": "Detect product lifecycle stage (introduction/growth/maturity/decline) and recommend pricing strategy.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "weekly_sales": {"type": "array", "items": {"type": "number"}, "description": "Weekly sales volumes"},
-                        "weeks_since_launch": {"type": "integer"},
-                    },
-                    "required": ["weekly_sales"],
-                },
-                "handler": self._handle_pricing_lifecycle,
-            },
-            # Phase 3: Fulfillment tools
-            "fulfill_routing": {
-                "description": "Solve TSP route optimization using nearest neighbor + 2-opt improvement.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "locations": {"type": "array", "items": {"type": "object"}, "description": "Locations with lat, lon, demand"},
-                        "vehicle_capacity": {"type": "number", "default": 1000.0},
-                    },
-                    "required": ["locations"],
-                },
-                "handler": self._handle_fulfill_routing,
-            },
-            "what_if": {
-                "description": "Run multi-scenario what-if simulation comparing different parameter sets side by side.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "base_params": {"type": "object", "description": "Base parameters for simulation"},
-                        "scenarios": {"type": "array", "items": {"type": "object"}, "description": "Scenario definitions with name and params"},
-                        "skill_name": {"type": "string", "default": "inventory-policy-sim"},
-                    },
-                    "required": ["base_params", "scenarios"],
-                },
-                "handler": self._handle_what_if,
-            },
-        }
-
-    # ── Tool Handlers ──
-
-    def _handle_demand_forecast(self, arguments: dict) -> dict:
-        from supplymind.skills.demand.forecast.main import DemandForecast
-        from supplymind.skills.demand.forecast.schema import ForecastInput
-
-        params = ForecastInput(**arguments)
-        skill = DemandForecast()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_demand_decompose(self, arguments: dict) -> dict:
-        from supplymind.skills.demand.decompose.main import DemandDecompose
-        from supplymind.skills.demand.decompose.schema import DecomposeInput
-
-        params = DecomposeInput(**arguments)
-        skill = DemandDecompose()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_inventory_classify(self, arguments: dict) -> dict:
-        from supplymind.core.classification import abc_xyz_matrix
-
-        items = arguments.get("items", [])
-        result = abc_xyz_matrix(items)
-        # Convert to serializable format
-        output = {
-            "summary": result.summary,
-            "matrix": {},
-        }
-        for label, cell in result.matrix.items():
-            output["matrix"][label] = {
-                "item_ids": cell.item_ids,
-                "count": cell.count,
-                "total_value": cell.total_value,
-                "strategy": cell.strategy,
-            }
-        return output
-
-    def _handle_reorder(self, arguments: dict) -> dict:
-        from supplymind.skills.inventory.reorder.main import InventoryReorder
-        from supplymind.skills.inventory.reorder.schema import ReorderInput
-
-        params = ReorderInput(
-            sku_id=arguments["sku_id"],
-            current_inventory=arguments["current_inventory"],
-            demand_forecast=arguments.get("demand_forecast", []),
-            lead_time_days=arguments.get("lead_time_days", 7),
-            target_service_level=arguments.get("service_level", 0.95),
+def _create_mcp_server() -> "FastMCP":
+    """Create and configure the MCP server with all SupplyMind tools."""
+    if not _MCP_AVAILABLE:
+        raise ImportError(
+            "MCP SDK not installed. Install with: pip install supplymind[mcp]\n"
+            "Or directly: pip install mcp>=1.0.0"
         )
-        skill = InventoryReorder()
-        result = skill.run(params)
-        return result.model_dump()
 
-    def _handle_safety_stock(self, arguments: dict) -> dict:
-        from supplymind.core.inventory_models import ss_service_level_full, ss_stochastic
+    mcp = FastMCP(
+        "SupplyMind",
+        version="0.1.0",
+        description="Supply chain planning agent toolkit with 23 skills",
+    )
 
-        method = arguments.get("method", "service_level")
-        if method == "monte_carlo":
-            result = ss_stochastic(
-                demand_std=arguments["demand_std"],
-                lead_time_mean=arguments["lead_time_mean"],
-                target_service_level=arguments.get("target_service_level", 0.95),
-            )
-        else:
-            result = ss_service_level_full(
-                demand_mean_daily=100.0,  # Approximate
-                std_demand_daily=arguments["demand_std"],
-                lead_time_mean_days=arguments["lead_time_mean"],
-                std_lead_time_days=0.0,
-                target_service_level=arguments.get("target_service_level", 0.95),
-            )
-
-        return {
-            "safety_stock": round(result.safety_stock, 2),
-            "reorder_point": round(result.reorder_point, 2),
-            "service_level_achieved": result.service_level_achieved,
-            "method": result.method,
-        }
-
-    def _handle_data_profiler(self, arguments: dict) -> dict:
-        from supplymind.skills.common.data_profiler.main import DataProfiler
-        from supplymind.skills.common.data_profiler.schema import ProfilerInput
-
-        data_arg = arguments.get("data", {})
-        # Accept both dict (wrapped) and list (raw demand records)
-        if isinstance(data_arg, list):
-            data_input = {"demand_history": data_arg}
-        else:
-            data_input = data_arg if isinstance(data_arg, dict) else {}
-        params = ProfilerInput(data=data_input)
-        skill = DataProfiler()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_run_pipeline(self, arguments: dict) -> dict:
-        from supplymind.pipelines.engine import PipelineEngine
-
-        engine = PipelineEngine(
-            pipeline_path=arguments["pipeline_path"],
-            data_path=arguments.get("data_path"),
-        )
-        result = engine.run()
-        return {
-            "name": result.name,
-            "status": result.status.value,
-            "completed_steps": result.completed_steps,
-            "total_steps": result.total_steps,
-            "duration_seconds": round(result.duration_seconds, 2),
-            "output_summary": result.output_summary,
-            "errors": result.errors,
-        }
-
-    def _handle_pricing_elasticity(self, arguments: dict) -> dict:
-        from supplymind.skills.pricing.elasticity.main import PricingElasticity
-        from supplymind.skills.pricing.elasticity.schema import ElasticityInput
-
-        params = ElasticityInput(**arguments)
-        skill = PricingElasticity()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_pricing_markdown(self, arguments: dict) -> dict:
-        from supplymind.skills.pricing.markdown.main import PricingMarkdown
-        from supplymind.skills.pricing.markdown.schema import MarkdownInput
-
-        params = MarkdownInput(**arguments)
-        skill = PricingMarkdown()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_pricing_lifecycle(self, arguments: dict) -> dict:
-        from supplymind.skills.pricing.lifecycle.main import PricingLifecycle
-        from supplymind.skills.pricing.lifecycle.schema import LifecycleInput
-
-        params = LifecycleInput(**arguments)
-        skill = PricingLifecycle()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_fulfill_routing(self, arguments: dict) -> dict:
-        from supplymind.skills.fulfillment.routing.main import FulfillmentRouting
-        from supplymind.skills.fulfillment.routing.schema import RoutingInput
-
-        params = RoutingInput(**arguments)
-        skill = FulfillmentRouting()
-        result = skill.run(params)
-        return result.model_dump()
-
-    def _handle_what_if(self, arguments: dict) -> dict:
-        from supplymind.skills.common.what_if.main import WhatIfSimulator
-        from supplymind.skills.common.what_if.schema import WhatIfInput
-
-        params = WhatIfInput(**arguments)
-        skill = WhatIfSimulator()
-        result = skill.run(params)
-        return result.model_dump()
-
-    # ── Public API ──
-
-    def list_tools(self) -> list[dict]:
-        """List all available tools with their schemas."""
-        tools = []
-        for name, spec in self._tools.items():
-            tools.append({
-                "name": name,
-                "description": spec["description"],
-                "input_schema": spec["input_schema"],
-            })
-        return tools
-
-    def call_tool(self, name: str, arguments: dict | None = None) -> dict:
-        """Call a tool by name with given arguments."""
-        if name not in self._tools:
-            return {
-                "success": False,
-                "tool": name,
-                "error": f"Unknown tool: {name}. Available: {list(self._tools.keys())}",
-            }
-
-        try:
-            handler = self._tools[name]["handler"]
-            result = handler(arguments or {})
-            return {
-                "success": True,
-                "tool": name,
-                "result": result,
-            }
-        except Exception as e:
-            logger.error(f"Tool '{name}' error: {e}\n{traceback.format_exc()}")
-            return {
-                "success": False,
-                "tool": name,
-                "error": f"{type(e).__name__}: {str(e)}",
-            }
-
-    def handle_request(self, request: dict) -> dict:
-        """Handle an incoming MCP-style request.
-
-        Request format:
-        {
-            "jsonrpc": "2.0",
-            "method": "tools/list" | "tools/call",
-            "id": <request_id>,
-            "params": {...}
-        }
-        """
-        method = request.get("method", "")
-        req_id = request.get("id")
-        params = request.get("params", {})
-
-        if method == "tools/list":
-            return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": self.list_tools()}}
-
-        elif method == "tools/call":
-            tool_name = params.get("name", "")
-            args = params.get("arguments", {})
-            result = self.call_tool(tool_name, args)
-            return {"jsonrpc": "2.0", "id": req_id, "result": result}
-
-        else:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32601, "message": f"Method not found: {method}"},
-            }
-
-    def start_stdio_server(self):
-        """Start an MCP server reading JSON-RPC from stdin, writing to stdout."""
-        import sys
-
-        logger.info("MCP stdio server starting...")
-        sys.stderr.write("SupplyMind MCP Server running (stdio mode)\n")
-        sys.stderr.flush()
-
-        for line in sys.stdin:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                request = json.loads(line)
-                response = self.handle_request(request)
-                print(json.dumps(response, ensure_ascii=False, default=str))
-                sys.stdout.flush()
-            except json.JSONDecodeError as e:
-                error_resp = {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {"code": -32700, "message": f"Parse error: {e}"},
-                }
-                print(json.dumps(error_resp))
-                sys.stdout.flush()
+    # PLACEHOLDER_TOOLS
+    return mcp
 
 
-# Convenience function for CLI entry point
+def _register_all_tools(mcp: "FastMCP"):
+    """Register all 23 SupplyMind tools on the FastMCP server."""
+
+    # ── Common Tools ──
+
+    @mcp.tool()
+    async def data_profiler(data: list[dict], profile_type: str = "quick") -> str:
+        """Profile and analyze supply chain data quality.
+        Detects missing values, outliers, duplicates, and provides statistical summaries.
+        Use as the FIRST step when working with any new dataset."""
+        return await _call_skill_handler("data_profiler", {
+            "data": data, "profile_type": profile_type,
+        })
+
+    @mcp.tool()
+    async def report_generator(title: str, sections: list[dict], format: str = "markdown") -> str:
+        """Generate formatted analysis reports from supply chain data.
+        Supports markdown and HTML output formats."""
+        return await _call_skill_handler("report_generator", {
+            "title": title, "sections": sections, "format": format,
+        })
+
+    @mcp.tool()
+    async def what_if(base_params: dict, scenarios: list[dict], skill_name: str = "inventory-policy-sim") -> str:
+        """Run multi-scenario what-if simulation comparing different parameter sets.
+        Useful for comparing conservative vs aggressive strategies."""
+        return await _call_skill_handler("what_if", {
+            "base_params": base_params, "scenarios": scenarios, "skill_name": skill_name,
+        })
+
+    # ── Demand Tools ──
+
+    @mcp.tool()
+    async def demand_forecast(
+        demand_history: list[dict],
+        horizon: int = 14,
+        method: str = "auto",
+        confidence_level: float = 0.95,
+    ) -> str:
+        """Generate demand forecasts with confidence intervals.
+        Methods: auto, ma, ema, holt_winters, croston.
+        Input: demand records with sku_id, date, quantity fields."""
+        return await _call_skill_handler("demand_forecast", {
+            "demand_history": demand_history, "horizon": horizon,
+            "method": method, "confidence_level": confidence_level,
+        })
+
+    @mcp.tool()
+    async def demand_decompose(demand_history: list[dict], period: int | None = None) -> str:
+        """Decompose time series into trend, seasonal, and residual components using STL."""
+        args: dict[str, Any] = {"demand_history": demand_history}
+        if period is not None:
+            args["period"] = period
+        return await _call_skill_handler("demand_decompose", args)
+
+    @mcp.tool()
+    async def demand_anomaly(demand_history: list[dict], method: str = "zscore", threshold: float = 3.0) -> str:
+        """Detect anomalies and outliers in demand data.
+        Methods: zscore, iqr. Returns flagged records and cleaned data."""
+        return await _call_skill_handler("demand_anomaly", {
+            "demand_history": demand_history, "method": method, "threshold": threshold,
+        })
+
+    @mcp.tool()
+    async def demand_newproduct(
+        sku_id: str, category: str, analog_skus: list[str] | None = None,
+        weeks_since_launch: int = 0,
+    ) -> str:
+        """Forecast demand for new products using analog/curve methods.
+        Handles cold-start by matching similar existing products."""
+        return await _call_skill_handler("demand_newproduct", {
+            "sku_id": sku_id, "category": category,
+            "analog_skus": analog_skus or [], "weeks_since_launch": weeks_since_launch,
+        })
+
+    @mcp.tool()
+    async def demand_intermittent(demand_history: list[dict], variant: str = "sba") -> str:
+        """Forecast intermittent/sporadic demand using Croston variants.
+        Variants: classic, sba (Syntetos-Boylan), tsb."""
+        return await _call_skill_handler("demand_intermittent", {
+            "demand_history": demand_history, "variant": variant,
+        })
+
+    @mcp.tool()
+    async def demand_reconcile(forecasts: list[dict], method: str = "bottom_up") -> str:
+        """Reconcile bottom-up and top-down forecast hierarchies.
+        Methods: bottom_up, top_down, middle_out."""
+        return await _call_skill_handler("demand_reconcile", {
+            "forecasts": forecasts, "method": method,
+        })
+
+    # ── Inventory Tools ──
+
+    @mcp.tool()
+    async def inventory_reorder(
+        sku_id: str, current_inventory: float, demand_forecast: list[float],
+        lead_time_days: float = 7.0, service_level: float = 0.95,
+    ) -> str:
+        """Calculate optimal reorder points and order quantities.
+        Returns EOQ, ROP, and urgency-ranked suggestions."""
+        return await _call_skill_handler("inventory_reorder", {
+            "sku_id": sku_id, "current_inventory": current_inventory,
+            "demand_forecast": demand_forecast, "lead_time_days": lead_time_days,
+            "target_service_level": service_level,
+        })
+
+    @mcp.tool()
+    async def inventory_safety_stock(
+        items: list[dict], target_service_level: float = 0.95, method: str = "service_level",
+    ) -> str:
+        """Calculate safety stock levels for target service levels.
+        Methods: service_level, stochastic (Monte Carlo)."""
+        return await _call_skill_handler("inventory_safety_stock", {
+            "items": items, "target_service_level": target_service_level, "method": method,
+        })
+
+    @mcp.tool()
+    async def inventory_policy_sim(
+        sku_id: str = "SKU001", demand_mean: float = 100.0, demand_std: float = 30.0,
+        lead_time_mean: float = 7.0, lead_time_std: float = 2.0,
+        reorder_point: float = 200.0, order_quantity: float = 500.0,
+        simulation_days: int = 365, n_simulations: int = 100,
+    ) -> str:
+        """Simulate inventory policies with Monte Carlo methods.
+        Compare (s,Q) and (s,S) policies under demand/lead-time uncertainty."""
+        return await _call_skill_handler("inventory_policy_sim", {
+            "sku_id": sku_id, "demand_mean": demand_mean, "demand_std": demand_std,
+            "lead_time_mean": lead_time_mean, "lead_time_std": lead_time_std,
+            "reorder_point": reorder_point, "order_quantity": order_quantity,
+            "simulation_days": simulation_days, "n_simulations": n_simulations,
+        })
+
+    @mcp.tool()
+    async def inventory_classify(items: list[dict]) -> str:
+        """Classify SKUs by ABC-XYZ analysis for inventory segmentation.
+        ABC = revenue contribution, XYZ = demand variability."""
+        return await _call_skill_handler("inventory_classify", {"items": items})
+
+    @mcp.tool()
+    async def inventory_multi_echelon(config: dict) -> str:
+        """Optimize inventory across multi-echelon supply networks.
+        Supports 2-level networks (factory→DC or DC→store)."""
+        return await _call_skill_handler("inventory_multi_echelon", config)
+
+    @mcp.tool()
+    async def inventory_newsvendor(
+        unit_price: float, unit_cost: float, salvage_value: float = 0.0,
+        demand_mean: float = 100.0, demand_std: float = 30.0,
+    ) -> str:
+        """Solve newsvendor problems for perishable/seasonal products.
+        Finds optimal order quantity balancing overage vs underage costs."""
+        return await _call_skill_handler("inventory_newsvendor", {
+            "unit_price": unit_price, "unit_cost": unit_cost,
+            "salvage_value": salvage_value,
+            "demand_mean": demand_mean, "demand_std": demand_std,
+        })
+
+    # ── Pricing Tools ──
+
+    @mcp.tool()
+    async def pricing_elasticity(prices: list[float], quantities: list[float]) -> str:
+        """Estimate price elasticity from historical price-quantity data.
+        Returns elasticity coefficient, classification, and revenue-optimal price."""
+        return await _call_skill_handler("pricing_elasticity", {
+            "prices": prices, "quantities": quantities,
+        })
+
+    @mcp.tool()
+    async def pricing_markdown(
+        current_stock: float, unit_cost: float, original_price: float,
+        elasticity: float = -2.0, days_remaining: int = 30,
+    ) -> str:
+        """Optimize phased markdown/clearance pricing strategy.
+        Maximizes revenue under time pressure for excess inventory."""
+        return await _call_skill_handler("pricing_markdown", {
+            "current_stock": current_stock, "unit_cost": unit_cost,
+            "original_price": original_price, "elasticity": elasticity,
+            "days_remaining": days_remaining,
+        })
+
+    @mcp.tool()
+    async def pricing_lifecycle(weekly_sales: list[float], weeks_since_launch: int | None = None) -> str:
+        """Detect product lifecycle stage (intro/growth/maturity/decline).
+        Recommends pricing strategy for each stage."""
+        args: dict[str, Any] = {"weekly_sales": weekly_sales}
+        if weeks_since_launch is not None:
+            args["weeks_since_launch"] = weeks_since_launch
+        return await _call_skill_handler("pricing_lifecycle", args)
+
+    @mcp.tool()
+    async def pricing_bundling(transactions: list[dict], min_support: float = 0.05) -> str:
+        """Recommend product bundles and bundle pricing.
+        Analyzes co-purchase patterns to find complementary products."""
+        return await _call_skill_handler("pricing_bundling", {
+            "transactions": transactions, "min_support": min_support,
+        })
+
+    # ── Fulfillment Tools ──
+
+    @mcp.tool()
+    async def fulfill_allocation(orders: list[dict], inventory: list[dict]) -> str:
+        """Allocate inventory across multiple warehouses/customers.
+        Uses priority rules + LP optimization with service level constraints."""
+        return await _call_skill_handler("fulfill_allocation", {
+            "orders": orders, "inventory": inventory,
+        })
+
+    @mcp.tool()
+    async def fulfill_routing(locations: list[dict], vehicle_capacity: float = 1000.0) -> str:
+        """Optimize delivery routes using nearest-neighbor + 2-opt TSP.
+        Input: locations with lat, lon, demand fields."""
+        return await _call_skill_handler("fulfill_routing", {
+            "locations": locations, "vehicle_capacity": vehicle_capacity,
+        })
+
+    @mcp.tool()
+    async def fulfill_wave(orders: list[dict], wave_capacity: int = 50) -> str:
+        """Plan wave picking batches for warehouse operations.
+        Groups orders by zone/priority for efficient picking."""
+        return await _call_skill_handler("fulfill_wave", {
+            "orders": orders, "wave_capacity": wave_capacity,
+        })
+
+    @mcp.tool()
+    async def fulfill_capacity(resources: list[dict]) -> str:
+        """Check fulfillment capacity and identify bottlenecks.
+        Evaluates warehouse/production capacity against demand."""
+        return await _call_skill_handler("fulfill_capacity", {"resources": resources})
+
+
+async def _call_skill_handler(skill_name: str, arguments: dict) -> str:
+    """Bridge: MCP tool call → SupplyMind agent handler → markdown + structured output."""
+    from supplymind.agent.tools import create_supplymind_tools, _extract_json_from_markdown
+
+    tools = create_supplymind_tools([skill_name])
+    if not tools:
+        return f"Error: skill '{skill_name}' not found in registry"
+
+    tool = tools[0]
+    if tool.handler is None:
+        return f"Error: skill '{skill_name}' has no handler"
+
+    output, success = await tool.handler(arguments)
+    if not success:
+        return f"Error executing {skill_name}: {output}"
+
+    structured = _extract_json_from_markdown(output)
+    if structured:
+        output += f"\n\n<!-- JSON: {json.dumps(structured, default=str)} -->"
+
+    return output
+
+
+# Module-level server instance (created lazily)
+_server: FastMCP | None = None
+
+
+def get_mcp_server() -> "FastMCP":
+    """Get or create the singleton MCP server."""
+    global _server
+    if _server is None:
+        _server = _create_mcp_server()
+        _register_all_tools(_server)
+    return _server
+
+
 def start_mcp_server(transport: str = "stdio"):
     """Start the MCP server.
 
     Args:
-        transport: 'stdio' for stdin/stdout, 'http' for HTTP server
+        transport: 'stdio' for stdin/stdout (Claude Desktop, Claude Code),
+                   'sse' for Server-Sent Events (web clients)
     """
-    server = MCPServer()
+    server = get_mcp_server()
+    server.run(transport=transport)
 
-    if transport == "stdio":
-        server.start_stdio_server()
-    elif transport == "http":
-        from http.server import HTTPServer, BaseHTTPRequestHandler
-        import urllib.parse
 
-        class MCPHandler(BaseHTTPRequestHandler):
-            def do_POST(self):
-                content_length = int(self.headers.get('Content-Length', 0))
-                body = self.rfile.read(content_length)
+# ── Legacy compatibility ──
+
+class MCPServer:
+    """Legacy MCP server wrapper for backward compatibility.
+
+    New code should use get_mcp_server() or start_mcp_server() instead.
+    """
+
+    def __init__(self):
+        self._tools = self._build_tool_list()
+
+    def _build_tool_list(self) -> dict:
+        from supplymind.agent.tools import create_supplymind_tools
+        tools = create_supplymind_tools()
+        return {t.name: t for t in tools}
+
+    def list_tools(self) -> list[dict]:
+        return [
+            {"name": t.name, "description": t.description, "input_schema": t.parameters}
+            for t in self._tools.values()
+        ]
+
+    def call_tool(self, name: str, arguments: dict | None = None) -> dict:
+        tool = self._tools.get(name)
+        if tool is None:
+            return {"success": False, "error": f"Unknown tool: {name}"}
+        try:
+            loop = asyncio.new_event_loop()
+            output, success = loop.run_until_complete(tool.handler(arguments or {}))
+            loop.close()
+            return {"success": success, "tool": name, "result": output}
+        except Exception as e:
+            return {"success": False, "tool": name, "error": str(e)}
+
+    def handle_request(self, request: dict) -> dict:
+        method = request.get("method", "")
+        req_id = request.get("id")
+        params = request.get("params", {})
+        if method == "tools/list":
+            return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": self.list_tools()}}
+        elif method == "tools/call":
+            result = self.call_tool(params.get("name", ""), params.get("arguments", {}))
+            return {"jsonrpc": "2.0", "id": req_id, "result": result}
+        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
+
+    def start_stdio_server(self):
+        if _MCP_AVAILABLE:
+            start_mcp_server("stdio")
+        else:
+            import sys
+            logger.info("MCP SDK not available, using legacy JSON-RPC mode")
+            for line in sys.stdin:
+                line = line.strip()
+                if not line:
+                    continue
                 try:
-                    request = json.loads(body)
-                    response = server.handle_request(request)
-                    self.send_response(200)
-                    self.send_header('Content-Type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response, ensure_ascii=False, default=str).encode())
-                except Exception as e:
-                    self.send_response(400)
-                    self.send_header('Content-Type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": str(e)}).encode())
-
-            def do_GET(self):
-                if self.path == "/tools":
-                    response = {"tools": server.list_tools()}
-                    self.send_response(200)
-                    self.send_header('Content-Type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode())
-                else:
-                    self.send_response(404)
-                    self.end_headers()
-
-            def log_message(self, format, *args):
-                pass  # Suppress default logging
-
-        httpd = HTTPServer(('127.0.0.1', 8765), MCPHandler)
-        logger.info("MCP HTTP server starting on http://127.0.0.1:8765")
-        print("SupplyMind MCP Server running on http://127.0.0.1:8765")
-        httpd.serve_forever()
-    else:
-        raise ValueError(f"Unknown transport: {transport}. Use 'stdio' or 'http'.")
+                    request = json.loads(line)
+                    response = self.handle_request(request)
+                    print(json.dumps(response, ensure_ascii=False, default=str))
+                    sys.stdout.flush()
+                except json.JSONDecodeError as e:
+                    print(json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(e)}}))
+                    sys.stdout.flush()

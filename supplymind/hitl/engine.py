@@ -91,10 +91,25 @@ class ConfidenceResult:
 class HTLEngine:
     """Core HITL engine managing approval sessions."""
 
-    def __init__(self, default_timeout: float = 1800):  # 30 min default
+    def __init__(
+        self,
+        default_timeout: float = 1800,
+        feedback_collector=None,
+        learning_loop=None,
+        store=None,
+    ):
         self.default_timeout = default_timeout
         self._sessions: dict[str, HITLSession] = {}
         self._decision_callbacks: list[Callable] = []
+        self._feedback_collector = feedback_collector
+        self._learning_loop = learning_loop
+        self._store = store
+
+        if feedback_collector and learning_loop:
+            feedback_collector.set_learning_callback(learning_loop.on_feedback)
+
+        if store:
+            self._restore_sessions()
 
     def create_session(
         self,
@@ -130,6 +145,7 @@ class HTLEngine:
 
         self._sessions[session.id] = session
         logger.info(f"HITL session created: {session.id} (level={level}, skill={skill})")
+        self._persist_session(session)
 
         # Auto-resolve 'auto' level immediately
         if level == "auto":
@@ -164,6 +180,7 @@ class HTLEngine:
         logger.info(
             f"HITL session {session_id} resolved: {decision.value} — {reason}"
         )
+        self._persist_session(session)
 
         # Notify callbacks
         for cb in self._decision_callbacks:
@@ -171,6 +188,28 @@ class HTLEngine:
                 cb(session)
             except Exception:
                 pass
+
+        # Feed into learning loop via feedback collector
+        if self._feedback_collector and decision in (
+            HITLDecision.ADJUSTED, HITLDecision.REJECTED,
+        ):
+            from supplymind.hitl.feedback import FeedbackType
+            fb_type = (
+                FeedbackType.IMPLICIT_ADJUST if decision == HITLDecision.ADJUSTED
+                else FeedbackType.IMPLICIT_REJECT
+            )
+            try:
+                self._feedback_collector.record(
+                    session_id=session_id,
+                    feedback_type=fb_type,
+                    skill=session.skill,
+                    original=session.detail_data,
+                    adjustment=adjusted_data,
+                    comment=reason,
+                    hitl_session_id=session_id,
+                )
+            except Exception as e:
+                logger.debug(f"Feedback recording failed: {e}")
 
         return session
 
@@ -207,3 +246,50 @@ class HTLEngine:
             "rejected": sum(1 for s in sessions if s.status == HITLDecision.REJECTED),
             "adjusted": sum(1 for s in sessions if s.status == HITLDecision.ADJUSTED),
         }
+
+    def _persist_session(self, session: HITLSession):
+        if not self._store:
+            return
+        try:
+            data = {
+                "id": session.id,
+                "level": session.level,
+                "skill": session.skill,
+                "step_name": session.step_name,
+                "title": session.title,
+                "summary": session.summary,
+                "detail_data": session.detail_data,
+                "status": session.status.value if isinstance(session.status, HITLDecision) else str(session.status),
+                "created_at": session.created_at,
+                "resolved_at": session.resolved_at,
+                "resolution": session.resolution,
+                "adjusted_data": session.adjusted_data,
+                "timeout_seconds": session.timeout_seconds,
+            }
+            self._store.save(session.id, data)
+        except Exception as e:
+            logger.debug(f"Session persist failed: {e}")
+
+    def _restore_sessions(self):
+        if not self._store:
+            return
+        try:
+            all_data = self._store.load_all()
+            for sid, data in all_data.items():
+                status_str = data.get("status", "pending")
+                if status_str == "pending":
+                    session = HITLSession(
+                        level=data.get("level", "review"),
+                        skill=data.get("skill", ""),
+                        step_name=data.get("step_name", ""),
+                        title=data.get("title", ""),
+                        summary=data.get("summary", ""),
+                        detail_data=data.get("detail_data", {}),
+                        timeout_seconds=data.get("timeout_seconds", self.default_timeout),
+                    )
+                    session.id = sid
+                    session.created_at = data.get("created_at", session.created_at)
+                    self._sessions[sid] = session
+            logger.info(f"Restored {len(self._sessions)} pending HITL sessions from store")
+        except Exception as e:
+            logger.warning(f"Session restore failed: {e}")

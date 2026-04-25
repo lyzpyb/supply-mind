@@ -146,6 +146,7 @@ class PipelineEngine:
         pipeline_path: str,
         data_path: str | None = None,
         output_dir: str | None = None,
+        skill_evolution=None,
     ):
         self.pipeline_path = Path(pipeline_path)
         self.data_path = data_path
@@ -154,6 +155,7 @@ class PipelineEngine:
         self.context: dict[str, Any] = {}  # Shared context ($variables)
         self.step_results: list[StepResult] = []
         self._sse_listeners: list = []  # For Dashboard SSE
+        self._skill_evolution = skill_evolution
 
     def run(self) -> PipelineResult:
         """Execute the full pipeline."""
@@ -339,6 +341,10 @@ class PipelineEngine:
             step_result.status = StepStatus.COMPLETED
             step_result.output = output_dict
 
+            # Record execution in SkillEvolution if metrics available
+            if self._skill_evolution and isinstance(output_dict, dict):
+                self._record_evolution(skill_name, output_dict)
+
         except Exception as e:
             step_result.status = StepStatus.FAILED
             step_result.error = f"{type(e).__name__}: {str(e)}"
@@ -398,6 +404,36 @@ class PipelineEngine:
         """Register an SSE event listener."""
         self._sse_listeners.append(callback)
 
+    def _record_evolution(self, skill_name: str, output: dict):
+        """Record execution metrics in SkillEvolution if available."""
+        try:
+            mape = None
+            method = None
+            category = ""
+
+            if "summary" in output and isinstance(output["summary"], dict):
+                mape = output["summary"].get("avg_mape") or output["summary"].get("weighted_mape")
+                methods = output["summary"].get("method_distribution", {})
+                if methods:
+                    method = max(methods, key=methods.get)
+
+            if "forecasts" in output and isinstance(output["forecasts"], list):
+                for fc in output["forecasts"][:1]:
+                    if isinstance(fc, dict):
+                        method = method or fc.get("method_used")
+                        mape = mape or fc.get("mape")
+                        category = fc.get("category", "")
+
+            if mape is not None and method:
+                self._skill_evolution.record_execution(
+                    skill_name=skill_name,
+                    method=method,
+                    mape=float(mape),
+                    category=category,
+                )
+        except Exception as e:
+            logger.debug(f"Evolution recording failed: {e}")
+
     def _generate_report(self, name: str, status: PipelineStatus) -> str:
         """Generate a Markdown report of the pipeline execution."""
         sections = []
@@ -406,7 +442,7 @@ class PipelineEngine:
         summary_data = {
             "Pipeline Name": name,
             "Status": status.value,
-            "Steps Completed": f"{self.success_rate * 100:.0f}%",
+            "Steps Completed": f"{sum(1 for r in self.step_results if r.status == StepStatus.COMPLETED)}/{len(self.step_results)}",
             "Duration": f"{sum(r.duration_seconds for r in self.step_results):.1f}s",
         }
         sections.append({"type": "summary", "title": "Pipeline Execution Summary", "data": summary_data})
@@ -420,7 +456,7 @@ class PipelineEngine:
                 sr.skill,
                 sr.status.value,
                 f"{sr.duration_seconds:.2f}",
-                sr.error[:50] if sr else "",
+                sr.error[:50] if sr.error else "",
             ])
         sections.append({"type": "table", "title": "Step Details", "data": {"headers": headers, "rows": rows}})
 

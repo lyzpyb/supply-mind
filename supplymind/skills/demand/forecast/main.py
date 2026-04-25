@@ -42,6 +42,9 @@ class DemandForecast:
     - croston: For intermittent/sporadic demand
     """
 
+    def __init__(self, skill_evolution=None):
+        self._skill_evolution = skill_evolution
+
     def run(self, input_data: ForecastInput | dict) -> ForecastOutput:
         """Run demand forecast for all SKUs in the input data.
 
@@ -85,7 +88,8 @@ class DemandForecast:
             arr = np.array(quantities)
 
             # Run forecast
-            result = self._forecast_single(arr, method, horizon, conf_level)
+            category = records[0].get("category", "")
+            result = self._forecast_single(arr, method, horizon, conf_level, category=category)
 
             # Build daily forecasts
             last_date = max(r["date"] for r in records)
@@ -113,7 +117,6 @@ class DemandForecast:
 
             # Get extra info from records
             name = records[0].get("sku_name", sku_id)
-            category = records[0].get("category", "")
 
             all_forecasts.append(SKUForecastSummary(
                 sku_id=sku_id,
@@ -187,9 +190,18 @@ class DemandForecast:
         method: str,
         horizon: int,
         conf_level: float,
+        category: str = "",
     ) -> ForecastResult:
         """Run a single forecast on one time series."""
         values_list = values.tolist()
+
+        if method == "auto" and self._skill_evolution:
+            learned = self._skill_evolution.get_best_method("demand-forecast", category)
+            if learned and learned in ("ma", "ema", "holt_winters", "croston",
+                                       "moving_average", "exponential_moving_average"):
+                method_map = {"moving_average": "ma", "exponential_moving_average": "ema"}
+                method = method_map.get(learned, learned)
+                logger.info(f"Evolution selected method '{method}' for category '{category}'")
 
         if method == "auto":
             return auto_forecast(values_list, horizon, conf_level)

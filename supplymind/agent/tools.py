@@ -15,7 +15,9 @@ Each skill module exports:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 import traceback
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional, Sequence
@@ -97,28 +99,50 @@ class ToolRouter:
         self,
         tool_name: str,
         arguments: dict[str, Any],
-    ) -> tuple[str, bool]:
+        format: str = "markdown",
+    ) -> tuple[str, bool] | tuple[dict[str, Any], bool]:
         """Execute a tool by name with given arguments.
 
         Args:
             tool_name: The name of the tool to execute
             arguments: Dict of argument name -> value
+            format: Output format — "markdown" (default), "json", or "both"
 
         Returns:
-            Tuple of (output_string, success_bool)
+            Tuple of (output, success_bool).
+            When format="markdown": output is str.
+            When format="json": output is dict with {markdown, structured}.
+            When format="both": output is dict with {markdown, structured}.
         """
         tool = self.tools.get(tool_name)
         if tool is None:
-            return f"Unknown tool: '{tool_name}'. Available tools: {', '.join(sorted(self.tools.keys()))}", False
+            msg = f"Unknown tool: '{tool_name}'. Available tools: {', '.join(sorted(self.tools.keys()))}"
+            if format == "markdown":
+                return msg, False
+            return {"markdown": msg, "structured": None}, False
 
         if tool.handler is None:
-            return f"Tool '{tool_name}' has no handler configured", False
+            msg = f"Tool '{tool_name}' has no handler configured"
+            if format == "markdown":
+                return msg, False
+            return {"markdown": msg, "structured": None}, False
 
         try:
-            return await tool.handler(arguments)
+            markdown_output, success = await tool.handler(arguments)
+
+            if format == "markdown":
+                return markdown_output, success
+
+            structured = _extract_json_from_markdown(markdown_output)
+            result = {"markdown": markdown_output, "structured": structured}
+            return result, success
+
         except Exception as e:
             logger.error("Error executing tool '%s': %s", tool_name, e, exc_info=True)
-            return f"Error executing {tool_name}: {e}\n{traceback.format_exc()}", False
+            msg = f"Error executing {tool_name}: {e}\n{traceback.format_exc()}"
+            if format == "markdown":
+                return msg, False
+            return {"markdown": msg, "structured": None}, False
 
     async def call_tool_parallel(
         self,
@@ -148,6 +172,35 @@ class ToolRouter:
 
     def __contains__(self, name: str) -> bool:
         return name in self.tools
+
+
+def _extract_json_from_markdown(markdown: str) -> dict | None:
+    """Extract structured JSON from handler markdown output.
+
+    Handlers embed JSON in two ways:
+    1. ```json ... ``` code blocks (most handlers do this via model_dump())
+    2. <!-- JSON: {...} --> HTML comments (explicit structured data)
+
+    Returns the last/largest JSON object found, or None.
+    """
+    # Try HTML comment first (explicit structured data takes priority)
+    comment_match = re.search(r'<!--\s*JSON:\s*(\{.*?\})\s*-->', markdown, re.DOTALL)
+    if comment_match:
+        try:
+            return json.loads(comment_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try ```json code blocks
+    json_blocks = re.findall(r'```json\s*\n(.*?)\n```', markdown, re.DOTALL)
+    if json_blocks:
+        for block in reversed(json_blocks):
+            try:
+                return json.loads(block)
+            except json.JSONDecodeError:
+                continue
+
+    return None
 
 
 # ============================================================================
