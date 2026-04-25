@@ -235,5 +235,87 @@ def mcp_serve(transport: str):
         raise SystemExit(1)
 
 
+@main.command("dataset")
+@click.argument("action", type=click.Choice(["list", "validate", "info"]))
+@click.option("--id", "dataset_id", default=None, help="Dataset ID (for validate/info)")
+def dataset_cmd(action: str, dataset_id: str | None):
+    """Manage datasets: list, validate, or inspect.
+
+    \b
+    Examples:
+        supplymind dataset list
+        supplymind dataset validate --id retail_grocery
+        supplymind dataset info --id retail_grocery
+    """
+    from supplymind.datasets import list_datasets, validate_dataset, load_dataset
+
+    if action == "list":
+        datasets = list_datasets()
+        click.echo(f"\n  Available Datasets ({len(datasets)}):\n")
+        for ds in datasets:
+            status = "OK" if ds["available"] else "MISSING"
+            click.echo(f"  [{status}] {ds['id']}: {ds['description']}")
+        click.echo()
+
+    elif action == "validate":
+        if not dataset_id:
+            click.echo("Error: --id required for validate", err=True)
+            sys.exit(1)
+        report = validate_dataset(dataset_id)
+        click.echo(f"\n  Dataset Validation: {dataset_id}")
+        click.echo(f"  Demand records:  {report['demand_records']}")
+        click.echo(f"  SKU count:       {report['sku_count']}")
+        click.echo(f"  Inventory snaps: {report['inventory_snapshots']}")
+        if report["issues"]:
+            click.echo(f"  Issues ({len(report['issues'])}):")
+            for issue in report["issues"]:
+                click.echo(f"    - {issue}")
+        else:
+            click.echo("  Status: VALID")
+        click.echo()
+
+    elif action == "info":
+        if not dataset_id:
+            click.echo("Error: --id required for info", err=True)
+            sys.exit(1)
+        data = load_dataset(dataset_id)
+        click.echo(f"\n  Dataset: {dataset_id}")
+        click.echo(f"  Demand records:  {len(data.demand_history)}")
+        if data.demand_history:
+            skus = {r.sku_id for r in data.demand_history}
+            locs = {r.location_id for r in data.demand_history}
+            click.echo(f"  SKUs:            {len(skus)} ({', '.join(sorted(skus)[:5])})")
+            click.echo(f"  Locations:       {len(locs)} ({', '.join(sorted(locs)[:5])})")
+        click.echo(f"  SKU master:      {len(data.sku_master)} entries")
+        click.echo(f"  Inventory snaps: {len(data.inventory_snapshots)} entries")
+        click.echo()
+
+
+@main.command("benchmark")
+@click.option("--dataset", "-d", default="retail_grocery", help="Dataset ID to benchmark on")
+@click.option("--horizon", "-h", default=14, type=int, help="Forecast horizon in days")
+def benchmark_cmd(dataset: str, horizon: int):
+    """Run forecast benchmark against industry baselines.
+
+    \b
+    Examples:
+        supplymind benchmark
+        supplymind benchmark --dataset retail_grocery --horizon 7
+    """
+    from supplymind.benchmark import run_benchmark
+
+    click.echo(f"\n  Running benchmark on '{dataset}' (horizon={horizon})...\n")
+    report = run_benchmark(dataset_id=dataset, horizon=horizon)
+
+    click.echo(f"  {'Method':<25} {'MAPE':>8} {'RMSE':>8} {'MAE':>8} {'Time(ms)':>10}")
+    click.echo(f"  {'─' * 25} {'─' * 8} {'─' * 8} {'─' * 8} {'─' * 10}")
+    for r in sorted(report.results, key=lambda x: x.mape):
+        marker = " *" if r.method == report.best_method else ""
+        click.echo(
+            f"  {r.method:<25} {r.mape:>7.1f}% {r.rmse:>8.1f} {r.mae:>8.1f} {r.duration_ms:>9.1f}{marker}"
+        )
+    click.echo(f"\n  Best: {report.best_method} (MAPE={report.best_mape:.1f}%)\n")
+
+
 if __name__ == "__main__":
     main()

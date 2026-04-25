@@ -128,7 +128,20 @@ class ToolRouter:
             return {"markdown": msg, "structured": None}, False
 
         try:
+            import time as _time
+            _t0 = _time.time()
             markdown_output, success = await tool.handler(arguments)
+            _elapsed = (_time.time() - _t0) * 1000
+
+            try:
+                from supplymind.enterprise import get_audit_logger
+                get_audit_logger().log_skill_execution(
+                    skill=tool_name, arguments=arguments,
+                    outcome="success" if success else "error",
+                    duration_ms=_elapsed,
+                )
+            except Exception:
+                pass
 
             if format == "markdown":
                 return markdown_output, success
@@ -139,6 +152,16 @@ class ToolRouter:
 
         except Exception as e:
             logger.error("Error executing tool '%s': %s", tool_name, e, exc_info=True)
+
+            try:
+                from supplymind.enterprise import get_audit_logger
+                get_audit_logger().log_skill_execution(
+                    skill=tool_name, arguments=arguments,
+                    outcome="error", error=str(e),
+                )
+            except Exception:
+                pass
+
             msg = f"Error executing {tool_name}: {e}\n{traceback.format_exc()}"
             if format == "markdown":
                 return msg, False

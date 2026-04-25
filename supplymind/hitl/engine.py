@@ -182,6 +182,17 @@ class HTLEngine:
         )
         self._persist_session(session)
 
+        try:
+            from supplymind.enterprise import get_audit_logger
+            get_audit_logger().log_hitl_decision(
+                session_id=session_id,
+                skill=session.skill,
+                decision=decision.value,
+                reason=reason,
+            )
+        except Exception:
+            pass
+
         # Notify callbacks
         for cb in self._decision_callbacks:
             try:
