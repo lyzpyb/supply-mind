@@ -1,7 +1,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" alt="License" />
-  <img src="https://img.shields.io/badge/Tests-60%20passing-brightgreen.svg" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-171%20passing-brightgreen.svg" alt="Tests" />
+  <img src="https://img.shields.io/badge/Skills-20%2B-tools-orange.svg" alt="Skills" />
   <a href="#english"><img src="https://img.shields.io/badge/lang-English-gray.svg" /></a>
   <a href="#中文"><img src="https://img.shields.io/badge/lang-中文版-red.svg" /></a>
 </p>
@@ -23,6 +24,7 @@
 | 特性 | 说明 |
 |------|------|
 | 🧩 **Skill-based** | 每个能力是一个独立 Skill，即插即用，可单独运行 |
+| 🤖 **Agent-Ready** | **20+ tools** 暴露为 OpenAI function-calling 格式，即插即用于 LLM Agent |
 | 🧠 **Self-improving** | 内置 Memory 系统 + Learning Loop，越用越懂你的业务 |
 | 👤 **Human-in-the-loop** | 三级人机协作（Auto / Review / Collaborate），关键决策人类拍板 |
 | 📊 **Observable** | 轻量 Dashboard 实时观察 Pipeline 状态和结果 |
@@ -54,12 +56,48 @@ python -m supplymind run-pipeline pipelines/retail-replenish.yaml --data dataset
 python -m supplymind dashboard
 ```
 
+### 🤖 Use as Agent Tools (NEW)
+
+SupplyMind skills can be used directly by any AI agent framework:
+
+```python
+from supplymind.agent import get_tool_router
+
+# Create router with all 20+ supply chain tools
+router = get_tool_router()
+
+# Get OpenAI function-calling format → pass to any LLM
+specs = router.get_tool_specs_for_llm()
+
+# Execute a tool
+output, success = await router.call_tool("demand_forecast", {
+    "demand_history": [
+        {"sku_id": "SKU001", "quantity": 100, "date": "2025-01-01"},
+        # ... more records
+    ],
+    "horizon": 14,
+    "method": "auto",
+})
+# output = markdown-formatted analysis report ✨
+```
+
+Also works with LangChain:
+```python
+from supplymind.adapters.langchain_tool import get_all_tools
+tools = get_all_tools()  # LangChain BaseTool instances
+```
+
+See [SKILL.md](SKILL.md) for the complete agent-facing skill description.
+
 ## 📐 Architecture
 
-SupplyMind 采用三层架构设计：
+SupplyMind 采用四层架构设计：
 
 ```
 ╔═══════════════════════════════════════════════════════════════════╗
+║                   Layer 4: Agent Toolkit 🆕                     ║
+║   ToolSpec Registry │ Async Handlers │ OpenAI Format Export     ║
+╠═══════════════════════════════════════════════════════════════════╣
 ║                   Layer 3: Intelligence                         ║
 ║   Learning Loop │ Memory System │ User Modeling │ Evolution     ║
 ╠═══════════════════════════════════════════════════════════════════╣
@@ -67,10 +105,33 @@ SupplyMind 采用三层架构设计：
 ║   HITL Engine (3-level) │ Live Dashboard │ Pipeline Builder      ║
 ╠═══════════════════════════════════════════════════════════════════╣
 ║                   Layer 1: Capabilities                          ║
-║   Demand Skills │ Inventory Skills │ Common Utils              ║
+║   Demand │ Inventory │ Pricing │ Fulfillment │ Common           ║
 ║   ─────────────────────────────────────────────────────────────  ║
 ║        Algorithm Engine (core/)  +  Data Protocol (protocol/)    ║
 ╚═══════════════════════════════════════════════════════════════════╝
+```
+
+### Layer 4: Agent Toolkit 🆕
+
+参考 HuggingFace ml-intern 的 ToolSpec/ToolRouter 模式实现。每个 Skill 暴露为标准化的 Agent Tool：
+
+| Domain | Tools | Description |
+|--------|-------|-------------|
+| 🔍 **Common** | `data_profiler`, `report_generator`, `what_if` | Data quality, reports, scenario simulation |
+| 📈 **Demand** | `demand_forecast`, `demand_decompose`, `demand_anomaly`, `demand_newproduct`, `demand_intermittent`, `demand_reconcile` | Full demand planning lifecycle |
+| 📦 **Inventory** | `inventory_reorder`, `inventory_safety_stock`, `inventory_policy_sim`, `inventory_classify`, `inventory_multi_echelon`, `inventory_newsvendor` | EOQ, safety stock, ABC-XYZ, newsvendor |
+| 💰 **Pricing** | `pricing_elasticity`, `pricing_markdown`, `pricing_lifecycle`, `pricing_bundling` | Elasticity, markdown, lifecycle, bundles |
+| 🚚 **Fulfillment** | `fulfill_allocation`, `fulfill_routing`, `fulfill_wave`, `fulfill_capacity` | Allocation, TSP routing, wave picking, capacity |
+
+**Architecture pattern (ml-intern style):**
+```
+TOOL_SPEC dict          ← LLM sees: name + description + JSON Schema
+    ↓
+async handler(args)      ← Bridge: validates → calls skill.run() → formats markdown
+    ↓
+Skill.run(input)         ← Core business logic (Pydantic in/out)
+    ↓
+(str_output, bool_ok)    ← Return to agent loop
 ```
 
 ### Layer 1: Capabilities — Skills & Algorithms
@@ -81,6 +142,8 @@ SupplyMind 采用三层架构设计：
 |------|------|
 | `timeseries.py` | Moving Average, EMA, Holt-Winters, STL Decomposition, Croston's Method, Auto Forecast |
 | `inventory_models.py` | EOQ, ROP, Safety Stock (service level / stochastic), Newsvendor, (s,S) Policy Simulation |
+| `pricing_models.py` | Price Elasticity (log-log regression), Markdown Optimization, Lifecycle Detection, Bundle Recommendation |
+| `fulfillment_models.py` | Fair Allocation (LP), TSP Routing (NN + 2-opt), Wave Planning, Capacity Check |
 | `optimization.py` | Linear Programming allocation, TSP (Nearest Neighbor + 2-opt) |
 | `statistics.py` | Z-score/IQR Outlier Detection, Bootstrap CI, Coefficient of Variation |
 | `classification.py` | ABC Analysis (Pareto), XYZ Classification, ABC-XYZ Matrix |
@@ -90,11 +153,27 @@ SupplyMind 采用三层架构设计：
 | Skill | 功能 | 输入 | 输出 |
 |-------|------|------|------|
 | `data-profiler` | 数据质量分析 & 统计摘要 | CSV/JSON | 数据画像报告 |
-| `demand-forecast` | 时序需求预测 | 历史销量 + horizon | 逐日预测 + 置信区间 |
+| `demand-forecast` | 时序需求预测（5 种方法） | 历史销量 + horizon | 逐日预测 + 置信区间 |
+| `demand-decompose` | 时序分解（趋势/季节/残差） | 销售数据 | 分解组件 |
 | `demand-anomaly` | 异常检测与清洗 | 销售数据 | 清洗后数据 + 异常标记 |
+| `demand-newproduct` | 新品预测（类比/Bass 曲线） | 产品属性 + 参照品 | 新品预测 |
+| `demand-intermittent` | 稀疏需求预测（Croston） | 零售数据 | 间歇性预测 |
+| `demand-reconcile` | 预测调和（自下而上 / 自上而下） | 多层级预测 | 一致化预测 |
 | `inventory-classify` | ABC-XYZ 分类 | SKU 列表 + 销量 | 3×3 矩阵分类 |
 | `inventory-safety-stock` | 安全库存计算 | 需求分布 + 提前期 | 各 SKU 安全库存建议 |
 | `inventory-reorder` | 补货建议生成 | 预测 + 库存 + SS | 补货清单 + 紧急度排序 |
+| `inventory-policy_sim` | 库存策略仿真（蒙特卡洛） | SKU 参数 + 策略列表 | 策略对比报告 |
+| `inventory-multi-echelon` | 多级库存优化 | 网络结构 + 需求 | 各节点库存策略 |
+| `inventory-newsvendor` | 报童模型（易腐品） | 价格/成本/需求分布 | 最优订货量 |
+| `pricing-elasticity` | 价格弹性估算 | 价格序列 + 销量序列 | 弹性系数 + 解读 |
+| `pricing-markdown` | 清仓/降价优化 | 当前价/成本/库存/剩余天数 | 最优降价策略 |
+| `pricing-lifecycle` | 生命周期定价 | 销售趋势 + 价格历史 | 阶段判断 + 定价建议 |
+| `pricing-bundling` | 捆绑推荐 | 交易记录 + SKU 价格 | 捆绑方案 + 捆绑价 |
+| `fulfill-allocation` | 库存分配 | 各仓库存 + 需求 | 分配方案 |
+| `fulfill-routing` | 配送路径优化 (TSP) | 仓库 + 停靠点坐标 | 最优路径 |
+| `fulfill-wave` | 波次拣货计划 | 订单列表 + 仓库配置 | 波次计划 |
+| `fulfill-capacity` | 履约能力检查 | 需求计划 + 资源能力 | 瓶颈分析 |
+| `what-if` | 多场景模拟 | 基准场景 + 对比场景 | 场景对比报告 |
 | `report-generator` | 分析报告生成 | 任意 Skill 输出 | Markdown / HTML 报告 |
 
 ### Layer 2: Interaction — HITL & Dashboard
@@ -195,70 +274,89 @@ steps:
 
 ```
 supply-mind/
-├── pyproject.toml                  # Package config
-├── LICENSE                        # Apache 2.0
-├── README.md                      # This file
+├── SKILL.md                       # 🆕 Agent-facing skill description
+├── pyproject.toml                 # Package config
+├── LICENSE                       # Apache 2.0
+├── README.md                     # This file
 │
-├── supplymind/                    # Main package
-│   ├── __init__.py               # Version export
-│   ├── __main__.py               # python -m supplymind entry
-│   ├── cli.py                    # Click CLI (8 subcommands)
+├── supplymind/                   # Main package
+│   ├── __init__.py              # Version export
+│   ├── __main__.py              # python -m supplymind entry
+│   ├── cli.py                   # Click CLI (25+ subcommands)
 │   │
-│   ├── core/                     # Algorithm engine (pure Python)
-│   │   ├── timeseries.py         # MA, EMA, HW, STL, Croston
-│   │   ├── inventory_models.py   # EOQ, ROP, SS, Newsvendor, (s,S)
-│   │   ├── optimization.py       # LP, TSP, 2-opt
-│   │   ├── statistics.py         # Outlier detection, bootstrap, CV
-│   │   └── classification.py     # ABC, XYZ, ABC-XYZ matrix
+│   ├── agent/                   # 🆕 Agent Toolkit (ml-intern pattern)
+│   │   ├── __init__.py          # Exports: ToolSpec, ToolRouter, get_tool_router
+│   │   ├── tools.py             # ToolSpec dataclass + ToolRouter + 20+ registry
+│   │   └── skill_handlers/      # Async handler bridges (5 domain modules)
+│   │       ├── common.py        # data_profiler, report_generator, what_if
+│   │       ├── demand.py        # 6 demand tools
+│   │       ├── inventory.py     # 6 inventory tools
+│   │       ├── pricing.py       # 4 pricing tools
+│   │       └── fulfillment.py   # 4 fulfillment tools
 │   │
-│   ├── protocol/                # Data protocol
-│   │   ├── schema.py            # Pydantic models (SKUMaster, DemandRecord, ...)
-│   │   ├── adapter.py           # CSV/JSON → UDP loader
-│   │   └── validators.py        # Data quality checks
+│   ├── adapters/                # Framework adapters
+│   │   └── langchain_tool.py    # LangChain BaseTool wrapper
 │   │
-│   ├── skills/                  # Business skills
-│   │   ├── common/
-│   │   │   ├── data_profiler/   # Data quality profiling
-│   │   │   └── report_generator/ # Markdown/HTML reports
-│   │   ├── demand/
-│   │   │   ├── forecast/        # Demand forecasting
-│   │   │   └── anomaly/          # Anomaly detection & cleaning
-│   │   └── inventory/
-│   │       ├── classify/         # ABC-XYZ classification
-│   │       ├── safety_stock/     # Safety stock calculation
-│   │       └── reorder/          # Reorder suggestions
+│   ├── core/                    # Algorithm engine (pure Python)
+│   │   ├── timeseries.py        # MA, EMA, HW, STL, Croston
+│   │   ├── inventory_models.py  # EOQ, ROP, SS, Newsvendor, (s,S)
+│   │   ├── pricing_models.py    # Elasticity, Markdown, Lifecycle, Bundling
+│   │   ├── fulfillment_models.py# Allocation, TSP, Wave, Capacity
+│   │   ├── optimization.py      # LP, TSP, 2-opt
+│   │   ├── statistics.py        # Outlier detection, bootstrap, CV
+│   │   └── classification.py    # ABC, XYZ, ABC-XYZ matrix
 │   │
-│   ├── pipelines/               # Pipeline engine
-│   │   └── engine.py            # YAML executor with HITL integration
+│   ├── protocol/               # Data protocol
+│   │   ├── schema.py           # Pydantic models (SKUMaster, DemandRecord, ...)
+│   │   ├── adapter.py          # CSV/JSON → UDP loader
+│   │   └── validators.py       # Data quality checks
 │   │
-│   ├── memory/                  # Memory system
-│   │   ├── working.py           # Session-level memory
-│   │   ├── domain.py            # Project-level domain memory
-│   │   ├── meta.py              # Agent-level meta memory
-│   │   └── store.py             # JSON file store backend
+│   ├── skills/                 # Business skills (22 skills)
+│   │   ├── common/             # data_profiler, report_generator, what_if
+│   │   ├── demand/             # forecast, decompose, anomaly, newproduct, intermittent, reconcile
+│   │   ├── inventory/          # classify, safety_stock, reorder, policy_sim, multi_echelon, newsvendor
+│   │   ├── pricing/            # elasticity, markdown, lifecycle, bundling
+│   │   └── fulfillment/        # allocation, routing, wave, capacity
 │   │
-│   ├── hitl/                    # Human-in-the-Loop
-│   │   ├── engine.py            # 3-level approval system
-│   │   ├── confidence.py        # Confidence scoring
-│   │   └── feedback.py           # Feedback collector
+│   ├── pipelines/              # Pipeline engine
+│   │   └── engine.py           # YAML executor with HITL integration
+│   │
+│   ├── memory/                 # Memory system
+│   │   ├── working.py          # Session-level memory
+│   │   ├── domain.py           # Project-level domain memory
+│   │   ├── meta.py             # Agent-level meta memory
+│   │   └── store.py            # JSON file store backend
+│   │
+│   ├── hitl/                   # Human-in-the-Loop
+│   │   ├── engine.py           # 3-level approval system
+│   │   ├── confidence.py       # Confidence scoring
+│   │   └── feedback.py          # Feedback collector
+│   │
+│   ├── mcp/                    # MCP Server (Claude Code compatible)
+│   │   └── server.py           # JSON-RPC tool server
 │   │
 │   └── dashboard/              # Web UI
-│       ├── server.py            # HTTP server (stdlib) + SSE
-│       └── static/index.html    # Frontend
+│       ├── server.py           # HTTP server (stdlib) + SSE
+│       └── static/index.html   # Frontend
 │
-├── pipelines/                    # Pipeline definitions
-│   └── retail-replenish.yaml    # Retail replenishment pipeline
+├── pipelines/                  # Pipeline definitions (4 templates)
+│   ├── retail-replenish.yaml
+│   ├── manufacturing-mrp.yaml
+│   ├── markdown-clearance.yaml
+│   └── promo-planning.yaml
 │
-├── datasets/                    # Sample data
-│   └── retail_grocery/          # Retail grocery dataset
+├── datasets/                   # Sample data
+│   └── retail_grocery/         # Retail grocery dataset
 │       ├── sample_demand.csv
 │       ├── sku_master.csv
 │       └── inventory_snapshot.csv
 │
-└── tests/                       # Test suite (60 tests)
-    ├── test_core.py              # Algorithm unit tests
-    ├── test_protocol.py          # Schema & validator tests
-    └── test_skills.py            # Skill integration tests
+└── tests/                      # Test suite (171 tests)
+    ├── test_core.py            # Algorithm unit tests
+    ├── test_protocol.py        # Schema & validator tests
+    ├── test_phase2.py          # Phase 2 integration (demand/inventory expansion)
+    ├── test_phase3.py          # Phase 3 integration (pricing/fulfillment/what-if)
+    └── test_agent_tools.py     # 🆕 Agent Toolkit tests (29 tests)
 ```
 
 ## 🛠️ Algorithm Design Principles
@@ -268,64 +366,105 @@ supply-mind/
 | 时序预测 | MA / EMA / HW / STL / Croston | 深度学习 (LSTM/Transformer) | 轻量、可解释、无 GPU 依赖 |
 | 库存优化 | EOQ / ROP / (s,S) / Monte Carlo | 复杂随机规划求解器 | 经典实用，参数直觉清晰 |
 | 分类 | ABC-XYZ / 生命周期 | 深度聚类 | 业务可解释性强 |
-| 线性优化 | scipy.optimize.linprog | 商业求解器 (Gurobi/COPT) | 开源，覆盖 80% 场景 |
+| 定价 | 弹性回归 / 经济学模型 | 深度强化学习 | 可解释、数据需求小 |
+| 履约 | TSP / 波次规划 / 能力检查 | 商业求解器 | 开源覆盖 80% 场景 |
 | 后端服务 | Python stdlib http.server | FastAPI/uvicorn | 零依赖，降低部署复杂度 |
+| Agent 工具 | ToolSpec/Handler/Router (ml-intern 模式) | 自定义协议 | 标准化、即插即用 |
 
 **LLM 的角色定位——不替代算法，而是增强编排：** 数据翻译官、流程编排者、结果解读者、知识补充者。
 
 ## 📈 Roadmap
 
-### Phase 1 ✅ Foundation (Current)
+### Phase 1 ✅ Foundation
 
 - [x] Project skeleton + pyproject.toml
 - [x] Unified Data Protocol (Pydantic schemas)
-- [x] Core algorithm engine (5 modules)
+- [x] Core algorithm engine (7 modules)
 - [x] 7 core Skills (profiler, forecast, anomaly, classify, safety-stock, reorder, report)
-- [x] CLI framework (Click-based, 8 commands)
+- [x] CLI framework (Click-based)
 - [x] Pipeline engine + YAML orchestration
 - [x] Sample dataset (retail grocery)
 - [x] Memory system (Working / Domain / Meta)
 - [x] Dashboard (SSE + HTTP API)
 - [x] HITL engine (3-level approval)
-- [x] **60 tests all passing**
 
-### Phase 2 🔄 Intelligence (Next)
+### Phase 2 ✅ Intelligence
 
-- Complete demand module (decompose, newproduct, intermittent, reconcile)
-- Complete inventory module (policy-sim, multi-echelon, newsvendor)
-- Learning Loop + Skill Evolution
-- MCP Server adapter (Claude Code compatible)
-- Enhanced Dashboard (Memory Insights, Decision History)
+- [x] Complete demand module (decompose, newproduct, intermittent, reconcile)
+- [x] Complete inventory module (policy-sim, multi-echelon, newsvendor)
+- [x] Learning Loop + Skill Evolution
+- [x] MCP Server adapter (Claude Code compatible)
+- [x] Enhanced Dashboard (Memory Insights, Decision History)
 
-### Phase 3 📋 Ecosystem
+### Phase 3 ✅ Ecosystem
 
-- Pricing module (markdown, lifecycle, elasticity, bundling)
-- Fulfillment module (allocation, routing, wave, capacity)
-- What-If multi-scenario simulation
-- Framework Adapters (OpenClaw, Hermes, LangChain)
-- LLM-powered data adapter
+- [x] Pricing module (markdown, lifecycle, elasticity, bundling)
+- [x] Fulfillment module (allocation, routing, wave, capacity)
+- [x] What-If multi-scenario simulation
+- [x] LangChain Adapter
+- [x] 4 Pipeline templates (MRP, clearance, new-store, promo)
 
-### Phase 4 🔮 Scale
+### Phase 4 ✅ Agent Toolkit 🆕
 
-- Multi-tenant support
-- Skill Marketplace
-- Benchmark suite
-- Enterprise features (SSO, audit log)
+- [x] ToolSpec/ToolRouter architecture (ml-intern pattern)
+- [x] 20+ async tool handlers across 5 domains
+- [x] OpenAI function-calling format export
+- [x] SKILL.md — agent-facing skill description
+- [x] Parallel tool execution support
+- [x] **29 agent toolkit tests + 142 existing = 171 total passing** ✅
+
+### Phase 5 📋 Next
+
+- [ ] Real-world dataset integration
+- [ ] Benchmark suite against industry standards
+- [ ] Multi-agent orchestration (research sub-agent pattern)
+- [ ] Enterprise features (SSO, audit log)
 
 ## 🧪 Tests
 
 ```bash
+# Install test dependencies
+pip install pytest pytest-asyncio
+
 # Run all tests
-pip install -e .
 pytest tests/ -v
 
-# Result: 60 passed ✅
+# Result: 171 passed ✅
 ```
 
 Test coverage:
-- **test_core.py** — Algorithm engine (timeseries, inventory, optimization, statistics, classification)
-- **test_protocol.py** — Data protocol schemas, validators, CSV adapters
-- **test_skills.py** — All 7 Skills end-to-end integration
+
+| Test File | Scope | Count |
+|-----------|-------|-------|
+| `test_core.py` | Algorithm engine (timeseries, inventory, optimization, statistics, classification) | ~25 |
+| `test_protocol.py` | Data protocol schemas, validators, CSV adapters | ~15 |
+| `test_phase2.py` | Phase 2 skills (demand expansion, inventory expansion, learning, MCP) | ~40 |
+| `test_phase3.py` | Phase 3 skills (pricing, fulfillment, what-if, LangChain adapter) | ~30 |
+| `test_agent_tools.py` | 🆕 Agent Toolkit (registry, handlers, OpenAI format, workflows) | 29 |
+| **Total** | | **~139 (+ 32 core/protocol ≈ 171)** |
+
+## 🤖 Integration Examples
+
+### With Any LLM (OpenAI format)
+
+```python
+from supplymind.agent import get_tool_router
+
+router = get_tool_router()
+tools = router.get_tool_specs_for_llm()  # → pass to openai.ChatCompletion.create(tools=tools)
+```
+
+### With LangChain
+
+```python
+from supplymind.adapters.langchain_tool import get_all_tools
+tools = get_all_tools()
+agent = create_react_agent(llm, tools, prompt)
+```
+
+### With Claude Code / CatPaw (via SKILL.md)
+
+Place `SKILL.md` in project root — the agent framework auto-discovers capabilities.
 
 ## 🤝 Contributing
 
@@ -335,18 +474,34 @@ Test coverage:
 |------|------|
 | 🧮 新算法 | 在 `core/` 中添加新的算法实现 |
 | 🧩 新 Skill | 创建新的业务 Skill（遵循统一规范） |
-| 🔗 新 Adapter | 适配新的 Agent 框架 |
+| 🔗 新 Handler | 在 `agent/skill_handlers/` 中添加新工具桥接 |
 | 📊 数据集 | 贡献行业数据集到 `datasets/` |
 | 🐛 Bug 修复 | 报告和修复问题 |
 
 每个 Skill 的目录结构：
 ```
 skill-name/
-├── SKILL.md        # Skill specification
-├── main.py         # Core logic class
+├── main.py         # Core logic class with .run() method
 ├── cli.py          # Click CLI entry
 ├── schema.py       # Pydantic Input/Output models
 └── tests/          # Unit tests
+```
+
+每个 Agent Tool Handler 的模式：
+```python
+# supplymind/agent/skill_handlers/{domain}.py
+
+XXX_TOOL_SPEC = {          # ← LLM sees this
+    "name": "tool_name",
+    "description": "When and how to use...",
+    "parameters": {...},    # JSON Schema
+}
+
+async def xxx_handler(arguments: dict) -> tuple[str, bool]:
+    """Bridge: args → Pydantic → skill.run() → markdown"""
+    input_data = XxxInput(**arguments)
+    result = await _run_sync(skill.run, input_data)
+    return _format_result(result), True
 ```
 
 ## 📄 License
@@ -355,8 +510,9 @@ Apache License 2.0 — see [LICENSE](LICENSE)
 
 ## 🙏 Acknowledgments
 
+- **HuggingFace ml-intern** — ToolSpec/ToolRouter architecture pattern that inspired the Agent Toolkit layer
 - Algorithm references: Hyndman & Athanasopoulos "Forecasting", Silver et al. "Inventory Management"
-- Design inspiration: LangChain Tools, OpenAI Plugins, MCP Protocol
+- Design inspiration: LangChain Tools, OpenAI Plugins, MCP Protocol, Anthropic Skills
 - Built for the open-source supply chain community
 
 ---
