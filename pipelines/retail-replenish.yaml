@@ -1,0 +1,100 @@
+# SupplyMind Pipeline: Retail Replenishment
+# The canonical end-to-end retail supply chain planning pipeline
+#
+# 7 steps: data profiling → anomaly cleaning → forecasting →
+#          classification → safety stock → reorder → report
+
+name: retail-replenish
+description: "零售日常补货流程 — 从数据到补货建议的完整链路"
+trigger: "(补货|replenish|reorder|备货|进货)"
+version: "0.1.0"
+
+params:
+  service_level: 0.95
+  forecast_horizon: 14
+  anomaly_threshold: 3.0
+
+steps:
+  # Step 1: Data Profiling — understand the input data
+  - skill: data-profiler
+    output: $profiled
+    hitl: none
+    on_error: abort
+
+  # Step 2: Anomaly Detection — clean outliers from demand history
+  - skill: demand-anomaly
+    input: $profiled
+    output: $cleaned
+    params:
+      method: auto
+      threshold: 3.0
+      action: flag
+    hitl:
+      level: review
+      show: "检测到 {count} 个异常点，清洗前后对比"
+      actions: [accept, adjust, skip]
+      timeout: 30m
+    on_error: skip
+
+  # Step 3: Demand Forecasting — predict future demand
+  - skill: demand-forecast
+    input: $cleaned
+    output: $forecast
+    params:
+      horizon: 14
+      method: auto
+      confidence_level: 0.95
+    hitl:
+      level: auto
+      escalate_if:
+        - "mape > 25%"
+        - "new_sku_count > 10"
+        - "promo_detected"
+    on_error: retry
+    retry:
+      max: 2
+      delay: 3s
+
+  # Step 4: ABC-XYZ Classification — segment SKUs by value and variability
+  - skill: inventory-classify
+    input: $forecast
+    output: $classify
+    params:
+      a_threshold: 0.80
+      b_threshold: 0.95
+    hitl: none
+    on_error: skip
+
+  # Step 5: Safety Stock Calculation — determine buffer inventory
+  - skill: inventory-safety-stock
+    input: $classify
+    output: $safety_stock
+    params:
+      service_level: 0.95
+      method: service_level
+    hitl: none
+    on_error: skip
+
+  # Step 6: Reorder Suggestions — generate final replenishment recommendations
+  - skill: inventory-reorder
+    input: $safety_stock
+    output: $reorder
+    params:
+      service_level: 0.95
+      horizon: 14
+    hitl:
+      level: collaborate
+      present: what-if
+      require_approval: true
+      show: "共 {sku_count} 个SKU需要补货，预计金额 ¥{estimated_cost}"
+    on_error: abort
+
+  # Step 7: Report Generation — compile analysis report
+  - skill: report-generator
+    input: $reorder
+    output: $report
+    params:
+      title: "零售补货分析报告"
+      format: markdown
+    hitl: none
+    on_error: skip

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplyMind Dashboard — 供应链计划 Agent</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 700; }
+        .header h1 span { opacity: 0.85; font-size: 0.9rem; font-weight: 400; }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px; font-size: 0.85rem;
+            background: rgba(255,255,255,0.2); backdrop-filter: blur(10px);
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+        .status-dot.ready { background: var(--success); }
+        .status-dot.running { background: var(--warning); }
+        .status-dot.error { background: var(--danger); }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* Main */
+        .main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+        }
+        .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+        .card-subtitle { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Grid */
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+
+        /* Stat cards */
+        .stat-card {
+            background: var(--card-bg); border-radius: var(--radius);
+            padding: 20px; text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--primary);
+        }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: #f1f5f9; font-weight: 600; color: var(--text-muted); }
+        tr:hover { background: #f8fafc; }
+
+        /* Urgency badges */
+        .urgency-high { background: #fef2f2; color: var(--danger); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .urgency-medium { background: #fffbeb; color: var(--warning); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .urgency-low { background: #f0fdf4; color: var(--success); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .urgency-none { background: #f1f5f9; color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+
+        /* Progress bar */
+        .progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #7c3aed); border-radius: 4px; transition: width 0.3s ease; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: white; }
+
+        /* Pipeline steps */
+        .step-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 0; border-bottom: 1px solid var(--border);
+        }
+        .step-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+        }
+        .step-pending { background: #e2e8f0; color: var(--text-muted); }
+        .step-running { background: #fef3c7; color: var(--warning); }
+        .step-completed { background: #dcfce7; color: var(--success); }
+        .step-failed { background: #fee2e2; color: var(--danger); }
+        .step-info { flex: 1; }
+        .step-name { font-weight: 600; font-size: 0.9rem; }
+        .step-detail { font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Footer */
+        .footer { text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.85rem; }
+        .footer a { color: var(--primary); text-decoration: none; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 12px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>
+        🔗 SupplyMind
+        <span style="display:block;margin-top:4px">供应链计划 Agent 框架</span>
+    </h1>
+    <div class="status-badge" id="global-status">
+        <span class="status-dot ready"></span>
+        <span id="status-text">Ready</span>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- Stats Overview -->
+    <div class="grid-4" id="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-skus">--</div>
+            <div class="stat-label">SKU 数量</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-records">--</div>
+            <div class="stat-label">数据记录数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-quality">--</div>
+            <div class="stat-label">数据质量分</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-steps">--</div>
+            <div class="stat-label">Pipeline 步骤</div>
+        </div>
+    </div>
+
+    <!-- Pipeline Execution -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="card-title">🚀 Pipeline 执行</div>
+                <div class="card-subtitle">retail-replenish — 零售日常补货流程</div>
+            </div>
+            <button class="btn btn-primary" onclick="runPipeline()">▶ 运行 Pipeline</button>
+        </div>
+        <div class="progress-bar" style="margin-bottom:16px">
+            <div class="progress-fill" id="pipeline-progress" style="width:0%"></div>
+        </div>
+        <div id="pipeline-steps">
+            <div class="step-item"><div class="step-icon step-pending">1</div><div class="step-info"><div class="step-name">Data Profiler</div><div class="step-detail">数据质量分析</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">2</div><div class="step-info"><div class="step-name">Anomaly Detection</div><div class="step-detail">异常检测与清洗</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">3</div><div class="step-info"><div class="step-name">Demand Forecast</div><div class="step-detail">需求预测 (14天)</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">4</div><div class="step-info"><div class="step-name">ABC-XYZ Classification</div><div class="step-detail">库存分类</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">5</div><div class="step-info"><div class="step-name">Safety Stock</div><div class="step-detail">安全库存计算</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">6</div><div class="step-info"><div class="step-name">Reorder Suggestions</div><div class="step-detail">补货建议生成</div></div></div>
+            <div class="step-item"><div class="step-icon step-pending">7</div><div class="step-info"><div class="step-name">Report Generation</div><div class="step-detail">报告输出</div></div></div>
+        </div>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="grid-2">
+        <!-- Reorder Suggestions -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🚛 补货建议</div>
+                <span class="card-subtitle" id="reorder-count">等待执行...</span>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>SKU</th><th>当前库存</th><th>建议补货</th><th>紧急度</th><th>预计成本</th></tr>
+                </thead>
+                <tbody id="reorder-table-body">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">运行 Pipeline 后显示数据</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Forecast Summary -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📈 预测概览</div>
+                <span class="card-subtitle" id="forecast-count">等待执行...</span>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>SKU</th><th>方法</th><th>预测总量</th><th>MAPE%</th><th>置信度</th></tr>
+                </thead>
+                <tbody id="forecast-table-body">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">运行 Pipeline 后显示数据</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ABC-XYZ Matrix -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">🏷️ ABC-XYZ 分类矩阵</div>
+        </div>
+        <table style="max-width:500px;margin:0 auto">
+            <thead>
+                <tr><th></th><th>X (稳定)</th><th Y (中等)</th><th>Z (波动)</th></tr>
+            </thead>
+            <tbody id="abcxyz-body">
+                <tr><td><strong>A (高价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+                <tr><td><strong>B (中价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+                <tr><td><strong>C (低价值)</strong></td><td>--</td><td>--</td><td>--</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div class="footer">
+    SupplyMind v0.1.0 — Skill-based Supply Chain Planning Agent Framework |
+    <a href="https://github.com/user/supply-mind">GitHub</a>
+</div>
+
+<script>
+// ── Mock data for demo ──
+const mockReorders = [
+    {sku:'SKU001', stock:280, order:420, urgency:'high', cost:8400},
+    {sku:'SKU002', stock:120, order:180, urgency:'medium', cost:1440},
+    {sku:'SKU003', stock:450, order:200, urgency:'low', cost:2400},
+    {sku:'SKU004', stock:65, order:150, urgency:'high', cost:600},
+    {sku:'SKU005', stock:150, order:180, urgency:'medium', cost:3240},
+];
+
+const mockForecasts = [
+    {sku:'SKU001', method:'holt_winters', total:1980, mape:8.2, conf:0.92},
+    {sku:'SKU002', method:'ema', total:850, mape:11.5, conf:0.85},
+    {sku:'SKU003', method:'ma', total:450, mape:15.3, conf:0.78},
+    {sku:'SKU004', method:'holt_winters', total:380, mape:18.1, conf:0.72},
+    {sku:'SKU005', method:'ema', total:520, mape:13.7, conf:0.80},
+];
+
+const mockABCXYZ = {
+    'AX':5,'AY':2,'AZ':0,
+    'BX':3,'BY':4,'BZ':1,
+    'CX':2,'CY':3,'CZ':5,
+};
+
+function runPipeline() {
+    const statusBadge = document.getElementById('global-status');
+    const statusText = document.getElementById('status-text');
+    const progressFill = document.getElementById('pipeline-progress');
+    const steps = document.querySelectorAll('.step-item');
+
+    statusBadge.innerHTML = '<span class="status-dot running"></span><span>Running...</span>';
+    statusText.textContent = 'Running';
+
+    // Animate through steps
+    const stepDelays = [300, 800, 1500, 2200, 2900, 3600, 4300];
+    const totalDuration = 5000;
+
+    let currentStep = 0;
+
+    function animateStep() {
+        if (currentStep >= steps.length) {
+            // Complete
+            statusBadge.innerHTML = '<span class="status-dot ready"></span><span>Completed ✓</span>';
+            fillResults();
+            return;
+        }
+
+        // Mark previous as completed
+        if (currentStep > 0) {
+            const prevIcon = steps[currentStep - 1].querySelector('.step-icon');
+            prevIcon.className = 'step-icon step-completed';
+            prevIcon.textContent = '✓';
+        }
+
+        // Mark current as running
+        const icon = steps[currentStep].querySelector('.step-icon');
+        icon.className = 'step-icon step-running';
+        icon.textContent = '⏳';
+
+        progressFill.style.width = ((currentStep + 1) / steps.length * 100) + '%';
+
+        setTimeout(() => {
+            currentStep++;
+            animateStep();
+        }, stepDelays[currentStep] || 500);
+    }
+
+    animateStep();
+
+    // Update stats
+    document.getElementById('stat-skus').textContent = '5';
+    document.getElementById('stat-records').textContent = '~900';
+    document.getElementById('stat-quality').textContent = '82';
+    document.getElementById('stat-steps').textContent = '7/7';
+}
+
+function fillResults() {
+    // Fill reorder table
+    const tbody = document.getElementById('reorder-table-body');
+    tbody.innerHTML = mockReorders.map(r => `
+        <tr>
+            <td><strong>${r.sku}</strong></td>
+            <td>${r.stock}</td>
+            <td>${r.order}</td>
+            <td><span class="urgency-${r.urgency}">${r.urgency.toUpperCase()}</span></td>
+            <td>¥${r.cost.toLocaleString()}</td>
+        </tr>
+    `).join('');
+    document.getElementById('reorder-count').textContent = `${mockReorders.length} 个 SKU 需要补货`;
+
+    // Fill forecast table
+    const fbody = document.getElementById('forecast-table-body');
+    fbody.innerHTML = mockForecasts.map(f => `
+        <tr>
+            <td><strong>${f.sku}</strong></td>
+            <td>${f.method.replace('_',' ')}</td>
+            <td>${f.total.toLocaleString()}</td>
+            <td>${f.mape}%</td>
+            <td>${'█'.repeat(Math.round(f.conf * 8))} ${Math.round(f.conf*100)}%</td>
+        </tr>
+    `).join('');
+    document.getElementById('forecast-count').textContent = `${mockForecasts.length} 个 SKU 已预测`;
+
+    // Fill ABC-XYZ matrix
+    const abody = document.getElementById('abcxyz-body');
+    abody.innerHTML = `
+        <tr><td><strong>A (高价值)</strong></td><td>${mockABCXYZ.AX}</td><td>${mockABCXYZ.AY}</td><td>${mockABCXYZ.AZ}</td></tr>
+        <tr><td><strong>B (中价值)</strong></td><td>${mockABCXYZ.BX}</td><td>${mockABCXYZ.BY}</td><td>${mockABCXYZ.BZ}</td></tr>
+        <tr><td><strong>C (低价值)</strong></td><td>${mockABCXYZ.CX}</td><td>${mockABCXYZ.CY}</td><td>${mockABCXYZ.CZ}</td></tr>
+    `;
+}
+</script>
+
+</body>
+</html>

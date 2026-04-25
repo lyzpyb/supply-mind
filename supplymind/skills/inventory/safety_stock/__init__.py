@@ -1,0 +1,1 @@
+"""Safety Stock Skill."""
