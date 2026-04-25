@@ -24,7 +24,7 @@
 | 特性 | 说明 |
 |------|------|
 | 🧩 **Skill-based** | 每个能力是一个独立 Skill，即插即用，可单独运行 |
-| 🤖 **Agent-Ready** | **20+ tools** 暴露为 OpenAI function-calling 格式，即插即用于 LLM Agent |
+| 🤖 **Agent-Ready** | **20+ tools** 原生支持 Claude Code / CatPaw / LangChain / MCP，零配置即插即用 |
 | 🧠 **Self-improving** | 内置 Memory 系统 + Learning Loop，越用越懂你的业务 |
 | 👤 **Human-in-the-loop** | 三级人机协作（Auto / Review / Collaborate），关键决策人类拍板 |
 | 📊 **Observable** | 轻量 Dashboard 实时观察 Pipeline 状态和结果 |
@@ -275,6 +275,11 @@ steps:
 ```
 supply-mind/
 ├── SKILL.md                       # 🆕 Agent-facing skill description
+├── .claude/                        # 🆕 Claude Code native integration
+│   └── skills/
+│       └── supplymind/          # Claude Code Skill (auto-discovered)
+│           ├── SKILL.md          # Skill definition with allowed-tools
+│           └── scripts/sm.sh     # Quick runner script
 ├── pyproject.toml                 # Package config
 ├── LICENSE                       # Apache 2.0
 ├── README.md                     # This file
@@ -462,9 +467,39 @@ tools = get_all_tools()
 agent = create_react_agent(llm, tools, prompt)
 ```
 
-### With Claude Code / CatPaw (via SKILL.md)
+### With Claude Code / CatPaw (Native Skill)
 
-Place `SKILL.md` in project root — the agent framework auto-discovers capabilities.
+**Zero setup required.** SupplyMind includes a native Claude Code Skill at `.claude/skills/supplymind/SKILL.md`. When working in this project:
+
+```bash
+# Claude Code auto-discovers the skill and can execute any tool:
+# User: "Forecast demand for the next 14 days"
+# Claude: → reads SKILL.md → runs: python -m supplymind demand-forecast --input data.csv --horizon 14
+
+# Or use the quick runner:
+./.claude/skills/supplymind/scripts/sm.sh demand-forecast --input data.csv --horizon 14
+```
+
+The skill declares `allowed-tools: [Bash, Read, Write]` so Claude can execute CLI commands, read results, and write output files.
+
+### With MCP Server
+
+```python
+from supplymind.mcp.server import MCPServer
+server = MCPServer()
+server.start_stdio_server()   # or start_mcp_server(transport="http")
+# Connect from any MCP client: Claude Desktop, Cursor, VS Code, etc.
+```
+
+### Comparison: All Integration Methods
+
+| Method | Protocol | Setup Effort | Best For |
+|--------|----------|-------------|----------|
+| **Claude Code Skill** | Prompt Injection + Bash CLI | ⭐ Zero (auto-discover) | Claude Code, CatPaw users |
+| **Python API (ToolRouter)** | Async function calls | ⭐ Import & call | Custom agents, OpenAI format |
+| **LangChain Adapter** | BaseTool wrapper | ⭐ Import & call | LangChain/LangGraph apps |
+| **MCP Server** | JSON-RPC (stdio/HTTP) | ⭐⭐ Start server | Any MCP-compatible client |
+| **CLI** | Shell command | ⭐ Zero | Scripts, CI/CD, manual use |
 
 ## 🤝 Contributing
 

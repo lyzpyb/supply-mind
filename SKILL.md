@@ -1,6 +1,6 @@
 ---
 name: "supplymind"
-description: "Supply chain intelligence toolkit for AI agents. Provides demand forecasting, inventory optimization, pricing strategy, and fulfillment planning capabilities. Use this when the user needs supply chain analysis, demand planning, inventory decisions, pricing recommendations, or logistics optimization."
+description: "Supply chain intelligence toolkit for AI agents. Provides 20+ tools for demand forecasting, inventory optimization, pricing strategy, fulfillment planning, data profiling, and what-if simulation. Use this when the user needs supply chain analysis, demand planning, inventory decisions, pricing recommendations, logistics optimization, sales forecasting, stock management, or operations research. Triggers on: supply chain, forecast, reorder, safety stock, ABC-XYZ, elasticity, markdown, TSP, routing, allocation, newsvendor, wave picking, capacity, replenishment."
 tags:
   - "supply-chain"
   - "demand-planning"
@@ -8,6 +8,10 @@ tags:
   - "pricing"
   - "fulfillment"
   - "operations-research"
+allowed-tools:
+  - "Bash"
+  - "Read"
+  - "Write"
 ---
 
 # SupplyMind — Supply Chain Intelligence for AI Agents
@@ -214,3 +218,29 @@ skills/{domain}/{name}/
 ├── main.py      # Skill class with .run() method  
 └── cli.py       # Click command-line interface
 ```
+
+## Claude Code Integration
+
+SupplyMind provides a **native Claude Code Skill** at `.claude/skills/supplymind/SKILL.md`. When working in this project directory, Claude Code auto-discovers the skill and can execute any tool via Bash:
+
+```bash
+# All 22 tools are available as CLI commands:
+python -m supplymind demand-forecast --input data.csv --horizon 14
+python -m supplymind inventory-reorder --input forecast.json
+python -m supplymind pricing-elasticity -p "9.99,8.99" -q "100,130"
+python -m supplymind fulfill-routing -l locations.json
+python -m supplymind run-pipeline pipelines/retail-replenish.yaml --data data.csv
+```
+
+See `.claude/skills/supplymind/SKILL.md` for the complete CLI reference and workflow examples.
+
+## OpenClaw / Generic Agent Integration
+
+For non-Claude Code agents, use the **ToolRouter** (Python API) or **MCP Server**:
+
+| Method | Entry Point | Best For |
+|--------|------------|----------|
+| **Python API** | `from supplymind.agent import get_tool_router` | Custom agents, OpenAI function-calling |
+| **LangChain** | `from supplymind.adapters.langchain_tool import get_all_tools` | LangChain/LangGraph agents |
+| **MCP Server** | `from supplymind.mcp.server import MCPServer` | Any MCP-compatible client (Claude Desktop, Cursor, etc.) |
+| **CLI** | `python -m supplymind <command>` | Shell scripts, CI/CD, Claude Code Bash |
