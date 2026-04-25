@@ -60,3 +60,7 @@ meta_memory.json
 .env
 .env.local
 *.local
+
+# Development docs (not for repo)
+DEVELOPMENT_PLAN.md
+*.plan.md
